@@ -1,0 +1,34 @@
+- Kich hoat moi truong: source venv/bin/activate
+
+- Kiem tra pi4 ket noi voi ESP32S3: ls /dev/ttyACM* 
+=> (/dev/ttyACM0)
+- Kiem tra USB: ls /dev/ttyUSB*
+
+- Cấp quyền truy cập: Để script Python có quyền đọc/ghi cổng này mà không cần sudo: sudo usermod -a -G dialout $USER
+
+- Tao file service cho chay tu dong:
+sudo nano /etc/systemd/system/sws.service
+
+[Unit]
+Description=SWS Sorting System Service
+After=network.target
+
+[Service]
+# Đường dẫn đến file python trong venv và file local_manager.py
+ExecStart=/home/thomas/SWS_Ecosystem/venv/bin/python /home/thomas/SWS_Ecosystem/local_manager.py
+WorkingDirectory=/home/thomas/SWS_Ecosystem
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=thomas
+
+[Install]
+WantedBy=multi-user.target
+
+- Nạp lại cấu hình: sudo systemctl daemon-reload
+- Cho phép chạy lúc khởi động: sudo systemctl enable sws.service
+- Bắt đầu chạy ngay: sudo systemctl start sws.service
+- Để xem Robot đang báo gì (Log): sudo journalctl -u sws.service -f
+- Để dừng hệ thống: sudo systemctl stop sws.service
+
+- Chạy hệ thống: python3 main.py

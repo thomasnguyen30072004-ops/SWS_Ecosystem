@@ -1,0 +1,18 @@
+# Chặn môi trường ảo (Cực kỳ nặng và không dùng chung được)
+venv/
+.venv/
+
+# Chặn các file biên dịch tạm của Python
+**/__pycache__/
+*.pyc
+
+# Chặn file cấu hình ẩn của hệ điều hành
+.DS_Store
+Thumbs.db
+
+# Chặn các file ảnh chụp test lúc debug camera
+*.jpg
+*.png
+
+.vscode/
+
