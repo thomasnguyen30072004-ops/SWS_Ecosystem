@@ -30,4 +30,7 @@ WantedBy=multi-user.target
 - Để xem Robot đang báo gì (Log): sudo journalctl -u sws.service -f
 - Để dừng hệ thống: sudo systemctl stop sws.service
 
+
+- Toàn bộ thư viện ở file requirements.txt: pip install -r requirements.txt
+
 - Chạy hệ thống: python3 main.py
