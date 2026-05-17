@@ -14,8 +14,7 @@ Description=SWS Sorting System Service
 After=network.target
 
 [Service]
-# Đường dẫn đến file python trong venv và file local_manager.py
-ExecStart=/home/thomas/SWS_Ecosystem/venv/bin/python /home/thomas/SWS_Ecosystem/local_manager.py
+ExecStart=/home/thomas/SWS_Ecosystem/venv/bin/python /home/thomas/SWS_Ecosystem/main.py
 WorkingDirectory=/home/thomas/SWS_Ecosystem
 StandardOutput=inherit
 StandardError=inherit
