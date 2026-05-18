@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hệ Thống Quản Lý Xe Tự Hành Phân Loại Rác</title>
+
+    <!-- Single bundled CSS -->
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+  </head>
+  <body>
+    <!-- ==================== LOGIN OVERLAY ==================== -->
+    <div id="loginOverlay" class="login-overlay active">
+      <div class="login-container">
+        <div class="login-header">
+          <h1>🚀Quản Lý Xe Tự Hành tích hợp xử lý rác</h1>
+          <p>Phân Loại & Thu Gom Rác Thải Thông Minh</p>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label for="username">Tài Khoản Quản Trị</label>
+            <input
+              type="text"
+              id="username"
+              placeholder="Nhập tài khoản"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Mật Khẩu</label>
+            <input
+              type="password"
+              id="password"
+              placeholder="Nhập mật khẩu"
+              required
+            />
+          </div>
+
+          <button type="submit" class="login-btn">Đăng Nhập</button>
+        </form>
+
+        <div class="login-footer">
+          <p>Demo: admin / 12345</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MAIN DASHBOARD ==================== -->
+    <div id="mainDashboard" class="dashboard">
+      <!-- Header -->
+      <header class="dashboard-header">
+        <div class="header-left">
+          <h1>📊 Dashboard Quản Lý</h1>
+          <p id="systemStatus" class="system-status">● Hệ Thống: Hoạt Động</p>
+        </div>
+        <div class="header-right">
+          <span id="userName" class="user-info"></span>
+          <span id="firebaseStatus" class="firebase-status disconnected"
+            >Disconnected</span
+          >
+
+          <div class="dashboard-controls">
+            <button id="historyNavBtn" class="history-nav-btn">
+              📊 Lịch Sử
+            </button>
+
+            <!-- Hamburger menu (adjacent to history) -->
+            <button id="headerMenuBtn" class="menu-btn" aria-label="Mở menu">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </button>
+
+            <div id="headerMenu" class="header-menu" aria-hidden="true">
+              <button id="themeToggleBtn" class="menu-item">
+                🌗 Chuyển giao diện
+              </button>
+              <button id="logoutBtn" class="menu-item">Đăng Xuất</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard-content">
+        <!-- Left Sidebar - Trash Levels -->
+        <aside class="sidebar-left">
+          <div class="trash-monitor">
+            <h3>📦 Mức Độ Rác</h3>
+
+            <div class="trash-container">
+              <div class="trash-level">
+                <div class="trash-bin" id="inorganic-fill">
+                  <img class="trash-icon" src="images/VC_0.png" alt="Vô Cơ" />
+                </div>
+                <label>Vô Cơ</label>
+              </div>
+
+              <div class="trash-level">
+                <div class="trash-bin" id="organic-fill">
+                  <img class="trash-icon" src="images/HC_0.png" alt="Hữu Cơ" />
+                </div>
+                <label>Hữu Cơ</label>
+              </div>
+
+              <div class="trash-level">
+                <div class="trash-bin full" id="recycle-fill">
+                  <img
+                    class="trash-icon"
+                    src="images/TC_100.png"
+                    alt="Tái Chế"
+                  />
+                </div>
+                <label>Tái Chế</label>
+              </div>
+
+              <div class="trash-level">
+                <div class="trash-bin full" id="other-fill">
+                  <img class="trash-icon" src="images/K_100.png" alt="Khác" />
+                </div>
+                <label>Khác</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- System Stats -->
+          <div class="system-stats">
+            <h3>⚙️ Thống Kê Hệ thống</h3>
+            <div class="stat-item">
+              <span>Chuyến Đi:</span>
+              <strong id="tripCount">1,245</strong>
+            </div>
+            <div class="stat-item">
+              <span>Pin:</span>
+              <strong id="batteryLevel">87%</strong>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Center - Video Stream & IMU Monitor -->
+        <section class="main-content">
+          <!-- Video Stream -->
+          <div class="video-container">
+            <div class="video-header">
+              <h3>📹 Camera Feed</h3>
+              <div class="camera-status">
+                <span class="status-indicator recording"></span> LIVE
+              </div>
+            </div>
+            <div class="video-stream">
+              <canvas id="videoCanvas" width="640" height="480"></canvas>
+              <div class="video-placeholder">
+                <p>Chờ kết nối Camera Pi 4...</p>
+                <small>Stream sẽ hiển thị ở đây</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- IMU Monitor -->
+          <div class="imu-monitor">
+            <h3>📍 Cảm Biến IMU</h3>
+            <div class="imu-chart-container">
+              <canvas id="imuChart"></canvas>
+            </div>
+            <div class="imu-values">
+              <div class="imu-value">
+                <label>Yaw (Z):</label>
+                <span id="yawValue">0.00°</span>
+              </div>
+              <div class="imu-value">
+                <label>Pitch (Y):</label>
+                <span id="pitchValue">0.00°</span>
+              </div>
+              <div class="imu-value">
+                <label>Roll (X):</label>
+                <span id="rollValue">0.00°</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right Sidebar - Manual Control -->
+        <aside class="sidebar-right">
+          <!-- Manual Control Section -->
+          <div class="control-section active" id="controlSection">
+            <div class="manual-control">
+              <h3>🎮 Điều Khiển Thủ Công</h3>
+
+              <!-- Joypad Style Navigation -->
+              <div class="joypad-container">
+                <button
+                  class="joypad-btn joypad-up"
+                  id="btnForward"
+                  data-command="FORWARD"
+                  title="Tiến Lên"
+                >
+                  ▲
+                </button>
+
+                <div class="joypad-middle">
+                  <button
+                    class="joypad-btn joypad-left"
+                    id="btnLeft"
+                    data-command="LEFT"
+                    title="Quay Trái"
+                  >
+                    ◄
+                  </button>
+                  <button
+                    class="joypad-btn joypad-center"
+                    id="btnStop"
+                    data-command="STOP"
+                    title="Dừng"
+                  >
+                    ◆
+                  </button>
+                  <button
+                    class="joypad-btn joypad-right"
+                    id="btnRight"
+                    data-command="RIGHT"
+                    title="Quay Phải"
+                  >
+                    ►
+                  </button>
+                </div>
+
+                <button
+                  class="joypad-btn joypad-down"
+                  id="btnBackward"
+                  data-command="BACKWARD"
+                  title="Lùi Lại"
+                >
+                  ▼
+                </button>
+              </div>
+
+              <!-- Speed Control -->
+              <div class="control-group">
+                <label for="speedSlider">Tốc Độ</label>
+                <input
+                  type="range"
+                  id="speedSlider"
+                  min="10"
+                  max="100"
+                  value="50"
+                />
+                <span id="speedValue">50%</span>
+              </div>
+
+              <!-- Function Buttons -->
+              <div class="control-group">
+                <button id="btnCollect" class="function-btn collect-btn">
+                  <span>🗑️ Thu Gom</span>
+                </button>
+                <button id="btnHome" class="function-btn home-btn">
+                  <span>🏠 QUAY VỀ</span>
+                </button>
+              </div>
+
+              <!-- Mode Selection -->
+              <div class="control-group">
+                <label for="modeSelect">Chế Độ</label>
+                <select id="modeSelect" class="mode-select">
+                  <option value="auto">Tự Động</option>
+                  <option value="manual">Thủ Công</option>
+                  <option value="idle">Chờ</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Command Log -->
+          <div class="command-log">
+            <h3>📋 Nhật Ký Lệnh</h3>
+            <div class="log-content" id="commandLog">
+              <p class="log-entry">[Chờ lệnh...]</p>
+            </div>
+            <button id="clearLogBtn" class="clear-btn">Xóa Nhật Ký</button>
+          </div>
+        </aside>
+      </main>
+
+      <!-- Footer -->
+      <footer class="dashboard-footer">
+        <div class="footer-info">
+          <span>🕐 Thời Gian: <span id="currentTime">00:00:00</span></span>
+          <span
+            >📡 Kết Nối:
+            <span id="connectionStatus" class="connection-good">Tốt</span></span
+          >
+          <span>🔗 Ping: <span id="pingValue">--ms</span></span>
+        </div>
+        <div class="footer-credits">
+          <p>© 2026 Hệ Thống Tự Động Phân Loại Rác - DATN</p>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Firebase (realtime bins from ESP32) -->
+    <script type="module" src="js/firebase.js"></script>
+    <!-- Single bundled JS -->
+    <script src="main.js"></script>
+  </body>
+</html>
