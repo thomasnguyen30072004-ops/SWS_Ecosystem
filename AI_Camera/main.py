@@ -37,7 +37,7 @@ def video_feed():
     return Response(generate_mjpeg_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def run_flask_server():
-    # Mở đúng cổng 8085 mà file main.js của ông đang chờ hứng
+    # Mở đúng cổng 8085 
     app.run(host='0.0.0.0', port=8085, threaded=True, use_reloader=False)
 # ---------------------------------------------------------------------------------
 
@@ -170,7 +170,7 @@ def main():
                 print("[HỆ THỐNG] Đã giải phóng Camera thành công. Quay lại chế độ ngủ đông... 💤")
                 print("==================================================")
 
-            # Chu kỳ quét UART khi đang ngủ đông (50ms một lần giúp Pi 4 mát mẻ, CPU tiêu thụ ~1%)
+            # Chu kỳ quét UART khi đang ngủ đông - Giảm tải CPU bằng cách tăng thời gian chờ giữa các lần quét
             time.sleep(0.05)
 
     except KeyboardInterrupt:
