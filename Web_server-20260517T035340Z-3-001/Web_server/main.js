@@ -11,6 +11,8 @@ const CONFIG = {
   TRASH_CHECK_INTERVAL: 2000,
   PING_INTERVAL: 3000,
   STATS_UPDATE_INTERVAL: 5000,
+  SNAPSHOT_UPDATE_INTERVAL: 1000,
+  PI_CAMERA_URL: "http://192.168.1.183:8085",
   MAX_CHART_POINTS: 30,
   MAX_LOG_ENTRIES: 50,
   NOTIFICATION_DURATION: 3000,
@@ -72,6 +74,45 @@ function updatePing() {
     const ping = Math.floor(Math.random() * 50) + 5;
     const pingElement = document.getElementById("pingValue");
     if (pingElement) pingElement.textContent = ping + "ms";
+  }
+}
+let lastSnapshotTs = 0;
+
+async function updateLatestSnapshot() {
+  const snapshotView = document.getElementById("snapshotView");
+  const placeholder = document.getElementById("streamPlaceholder");
+
+  if (!snapshotView || !placeholder) return;
+
+  try {
+    const infoResponse = await fetch(
+      `${CONFIG.PI_CAMERA_URL}/latest_info?t=${Date.now()}`
+    );
+
+    if (!infoResponse.ok) {
+      return;
+    }
+
+    const info = await infoResponse.json();
+
+    if (!info.available) {
+      snapshotView.style.display = "none";
+      placeholder.style.display = "flex";
+      return;
+    }
+
+    if (info.ts !== lastSnapshotTs) {
+      lastSnapshotTs = info.ts;
+
+      snapshotView.src = `${CONFIG.PI_CAMERA_URL}/latest.jpg?t=${Date.now()}`;
+      snapshotView.style.display = "block";
+      placeholder.style.display = "none";
+
+      addCommandLog(`📸 Ảnh mới: ${info.label || "Không rõ nhãn"}`, "success");
+      console.log("Latest snapshot updated:", info);
+    }
+  } catch (error) {
+    console.log("Cannot connect to Pi camera server:", error);
   }
 }
 function updateStatistics() {
@@ -1002,6 +1043,7 @@ function initializeIMUChart() {
 
 function startAutoUpdates() {
   setInterval(updateCurrentTime, 1000);
+
   setInterval(() => {
     if (appState.isAuthenticated && CONFIG.DEMO_MODE) {
       const yaw = Math.sin(Date.now() / 2000) * 45;
@@ -1010,8 +1052,12 @@ function startAutoUpdates() {
       updateIMUData(yaw, pitch, roll);
     }
   }, CONFIG.CHART_UPDATE_INTERVAL);
+
   setInterval(updatePing, CONFIG.PING_INTERVAL);
   setInterval(updateStatistics, CONFIG.STATS_UPDATE_INTERVAL);
+
+  updateLatestSnapshot();
+  setInterval(updateLatestSnapshot, CONFIG.SNAPSHOT_UPDATE_INTERVAL);
 }
 
 window.addEventListener("error", (event) => {

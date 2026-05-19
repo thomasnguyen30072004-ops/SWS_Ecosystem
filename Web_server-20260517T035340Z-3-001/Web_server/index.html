@@ -152,10 +152,13 @@
               </div>
             </div>
             <div class="video-stream">
-              <canvas id="videoCanvas" width="640" height="480"></canvas>
-              <div class="video-placeholder">
-                <p>Chờ kết nối Camera Pi 4...</p>
-                <small>Stream sẽ hiển thị ở đây</small>
+              <!-- Thêm thẻ img này vào để nhận ảnh snapshot tĩnh -->
+              <img id="snapshotView" src="" alt="Latest Trash Capture" style="width:100%; height:100%; object-fit: contain; display:none;" />
+              
+              <!-- Giữ lại placeholder để hiển thị khi hệ thống chưa có ảnh chụp -->
+              <div id="streamPlaceholder" class="video-placeholder">
+                <p>Chờ robot phát hiện rác...</p>
+                <small>Ảnh phân tích gần nhất sẽ hiển thị ở đây</small>
               </div>
             </div>
           </div>
