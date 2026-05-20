@@ -1,185 +1,424 @@
 import cv2
 import time
-from modules.hardware import send_servo_command, wait_for_esp32_log, get_esp32_connection
-from modules.ai_engine import load_yolo_model, predict_waste
-
-# --- THÊM ĐOẠN FLASK STREAM TRÊN RAM NÀY ĐỂ TƯƠNG THÍCH VỚI FILE MAIN.JS CỦA ÔNG ---
 import threading
-from flask import Flask, Response
+from flask import Flask, Response, jsonify
 from flask_cors import CORS
 
+from modules.hardware import (
+    send_servo_command,
+    wait_for_esp32_log,
+    get_esp32_connection,
+)
+
+from modules.ai_engine import (
+    load_yolo_model,
+    predict_waste,
+)
+
+
 app = Flask(__name__)
-CORS(app)  # Cho phép Web của ông kéo luồng ảnh về vẽ lên Canvas thoải mái
+CORS(app)
+
 
 streaming_frame = None
+latest_snapshot = None
+latest_snapshot_ts = 0
+latest_snapshot_label = ""
+
 frame_lock = threading.Lock()
 is_camera_on = False
+uart_rx_buffer = ""
+
+CONF_THRESHOLD = 0.6
+STABLE_FRAMES_REQ = 5
+BIN_FULL_THRESHOLD = 10.0
+CAMERA_INDEX = 0
+MAX_SESSION_TIMEOUT = 10
+
 
 def generate_mjpeg_stream():
     global streaming_frame, is_camera_on
+
     while True:
         with frame_lock:
             active = is_camera_on
-            frame = streaming_frame
-        
+            frame = None if streaming_frame is None else streaming_frame.copy()
+
         if active and frame is not None:
-            # Mã hóa ảnh sang JPG trực tiếp trên RAM để bắn lên Web nhanh nhất
-            ret, jpeg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            ret, jpeg = cv2.imencode(
+                ".jpg",
+                frame,
+                [int(cv2.IMWRITE_JPEG_QUALITY), 80],
+            )
+
             if ret:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-            time.sleep(0.04)  # Giới hạn ~25 FPS tránh tràn băng thông Pi
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + jpeg.tobytes()
+                    + b"\r\n"
+                )
+
+            time.sleep(0.04)
         else:
             time.sleep(0.1)
 
-@app.route('/video_feed')
+
+@app.route("/video_feed")
 def video_feed():
-    return Response(generate_mjpeg_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_mjpeg_stream(),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.route("/latest.jpg")
+def latest_jpg():
+    global latest_snapshot
+
+    with frame_lock:
+        frame = None if latest_snapshot is None else latest_snapshot.copy()
+
+    if frame is None:
+        return Response(status=204)
+
+    ret, jpeg = cv2.imencode(
+        ".jpg",
+        frame,
+        [int(cv2.IMWRITE_JPEG_QUALITY), 90],
+    )
+
+    if not ret:
+        return Response(status=500)
+
+    response = Response(jpeg.tobytes(), mimetype="image/jpeg")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    return response
+
+
+@app.route("/latest_info")
+def latest_info():
+    return jsonify(
+        {
+            "available": latest_snapshot is not None,
+            "ts": latest_snapshot_ts,
+            "label": latest_snapshot_label,
+        }
+    )
+
 
 def run_flask_server():
-    # Mở đúng cổng 8085 
-    app.run(host='0.0.0.0', port=8085, threaded=True, use_reloader=False)
-# ---------------------------------------------------------------------------------
+    app.run(
+        host="0.0.0.0",
+        port=8085,
+        threaded=True,
+        use_reloader=False,
+    )
 
-# --- Cấu hình hệ thống ---
-CONF_THRESHOLD = 0.6
-STABLE_FRAMES_REQ = 5
-BIN_FULL_THRESHOLD = 10.0  # Ngưỡng báo đầy: Khoảng cách từ cảm biến đến mặt rác < 10cm
+
+def close_serial_safely(ser):
+    try:
+        if ser:
+            ser.close()
+            print("[UART] Serial port closed. It will reconnect on the next loop.")
+    except Exception as e:
+        print(f"[UART WARNING] Could not close serial port: {e}")
+
+
+def clear_serial_buffers():
+    try:
+        ser = get_esp32_connection()
+
+        if ser and ser.is_open:
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+            print("[UART] Serial buffers cleared.")
+
+    except Exception as e:
+        print(f"[UART WARNING] Could not clear serial buffers: {e}")
+
+
+def read_uart_trigger():
+    global uart_rx_buffer
+
+    ser = None
+
+    try:
+        ser = get_esp32_connection()
+
+        if not ser:
+            return False
+
+        if hasattr(ser, "is_open") and not ser.is_open:
+            return False
+
+        if ser.in_waiting <= 0:
+            return False
+
+        raw = ser.read(ser.in_waiting)
+
+        if not raw:
+            return False
+
+        text = raw.decode("utf-8", errors="ignore")
+        text = text.replace("\r", "").replace("\n", "").replace(" ", "")
+
+        if text:
+            print(f"[UART RX RAW] {text}")
+
+        uart_rx_buffer += text
+
+        if len(uart_rx_buffer) > 300:
+            uart_rx_buffer = uart_rx_buffer[-300:]
+
+        # Nhận cả chuỗi đầy đủ và chuỗi bị mất ký tự đầu
+        if "CMD_START_CAM" in uart_rx_buffer or "START_CAM" in uart_rx_buffer:
+            print("[UART TRIGGER] START_CAM detected.")
+
+            uart_rx_buffer = ""
+
+            try:
+                ser.reset_input_buffer()
+            except Exception:
+                pass
+
+            return True
+
+        return False
+
+    except Exception as e:
+        print(f"[UART ERROR] Serial read failed: {e}")
+
+        if ser is not None:
+            close_serial_safely(ser)
+
+        time.sleep(1)
+        return False
+
+
+def update_latest_snapshot(frame, label):
+    global latest_snapshot
+    global latest_snapshot_ts
+    global latest_snapshot_label
+
+    with frame_lock:
+        latest_snapshot = frame.copy()
+        latest_snapshot_ts = int(time.time() * 1000)
+        latest_snapshot_label = label
+
+    print("[SNAPSHOT] Latest image updated for web.")
+
+
+def update_streaming_frame(frame):
+    global streaming_frame
+
+    with frame_lock:
+        streaming_frame = frame.copy()
+
+
+def set_camera_state(active):
+    global is_camera_on
+    global streaming_frame
+
+    with frame_lock:
+        is_camera_on = active
+
+        if not active:
+            streaming_frame = None
+
+
+def handle_esp32_after_detection(label):
+    print(f"[UART] Sending servo command: {label}")
+
+    try:
+        sent_ok = send_servo_command(label)
+
+        if not sent_ok:
+            print("[UART ERROR] Failed to send servo command.")
+            return
+
+        print("[UART] Waiting for ESP32 mechanical cycle and full-bin status...")
+
+        # Chờ phản hồi từ ESP32 (Thời gian chờ tối đa 15 giây)
+        raw_log = wait_for_esp32_log(timeout=15)
+
+        # Mảng tên các ngăn thùng rác để hiển thị log trực quan
+        names = ["Organic", "Inorganic", "Recycle", "Other"]
+
+        # TRƯỜNG HỢP 1: Không nhận được phản hồi gì (Thùng không đầy hoặc hết chu kỳ trong im lặng)
+        if not raw_log:
+            print("[SENSOR DATA] Sorted successfully. No full bin detected (All bins AVAILABLE).")
+            return
+
+        # Làm sạch chuỗi ký tự nhận được (Xóa xuống dòng, khoảng trắng)
+        raw_log = raw_log.replace("\r", "").replace("\n", "").strip()
+        print(f"[UART RX RAW] {raw_log}")
+
+        # TRƯỜNG HỢP 2: Phát hiện từ khóa báo đầy "BIN_FULL" từ ESP32
+        if "BIN_FULL" in raw_log:
+            try:
+                if ":" not in raw_log:
+                    print("[ERROR] Invalid BIN_FULL format: missing ':'")
+                    return
+
+                # Bóc tách lấy ký tự mã thùng rác (Ví dụ: "BIN_FULL:1" -> lấy "1")
+                bin_char = raw_log.split(":", 1)[1].strip()
+                
+                # Chuyển đổi ký tự mã thùng sang chỉ số mảng (Ví dụ: '1' -> 0, '2' -> 1)
+                bin_index = int(bin_char) - 1
+
+                if 0 <= bin_index < 4:
+                    print(f"⚠️ [ALERT] Bin {bin_index + 1} ({names[bin_index]}) is FULL! (< 10cm)")
+                    
+                    # --- THÊM LOGIC KÍCH HOẠT XE TỰ HÀNH TẠI ĐÂY ---
+                    # 
+                    #
+                    #
+                else:
+                    print(f"[ERROR] Invalid bin index received from ESP32: {bin_char}")
+
+            except Exception as e:
+                print(f"[ERROR] Failed to parse BIN_FULL log data: {e}")
+        
+        # TRƯỜNG HỢP 3: Nhận được log hoàn tất chu trình thông thường từ ESP32 mà không báo đầy
+        else:
+            print("[SENSOR DATA] Waste sorted successfully. Target bin is still AVAILABLE.")
+
+    except Exception as e:
+        print(f"[UART ERROR] ESP32 handling failed: {e}")
+
+        try:
+            ser = get_esp32_connection()
+            close_serial_safely(ser)
+        except Exception:
+            pass
+
+
+def run_camera_ai_session(model):
+    print("\n[IR TRIGGER] Trash detected. Opening camera...")
+
+    cap = None
+
+    try:
+        cap = cv2.VideoCapture(CAMERA_INDEX)
+
+        if not cap.isOpened():
+            print("[ERROR] Cannot open camera.")
+            time.sleep(0.5)
+            return
+
+        set_camera_state(True)
+
+        stable_counter = 0
+        last_label = ""
+        start_session_time = time.time()
+
+        while cap.isOpened():
+            if time.time() - start_session_time > MAX_SESSION_TIMEOUT:
+                print("\n[TIMEOUT] No stable label after 10 seconds. Closing camera...")
+                break
+
+            ret, frame = cap.read()
+
+            if not ret:
+                print("[WARNING] Cannot read frame from camera.")
+                time.sleep(0.1)
+                continue
+
+            label, prob, annotated = predict_waste(model, frame)
+
+            display_frame = annotated if annotated is not None else frame
+            update_streaming_frame(display_frame)
+
+            if label and prob is not None and (prob / 100) > CONF_THRESHOLD:
+                if label == last_label:
+                    stable_counter += 1
+                else:
+                    stable_counter = 1
+                    last_label = label
+
+                progress = int((stable_counter / STABLE_FRAMES_REQ) * 100)
+
+                print(
+                    f"[AI] Analyzing: {label} ({progress}%)",
+                    end="\r",
+                )
+
+                if stable_counter >= STABLE_FRAMES_REQ:
+                    print(f"\n[AI RESULT] Label confirmed: {label} ({prob:.1f}%)")
+
+                    update_latest_snapshot(display_frame, label)
+                    handle_esp32_after_detection(label)
+
+                    break
+
+            else:
+                stable_counter = 0
+
+            time.sleep(0.01)
+
+    except Exception as e:
+        print(f"[CAMERA ERROR] Camera session failed: {e}")
+
+    finally:
+        if cap is not None:
+            try:
+                cap.release()
+            except Exception as e:
+                print(f"[CAMERA WARNING] Could not release camera: {e}")
+
+        set_camera_state(False)
+        clear_serial_buffers()
+
+        print("[SYSTEM] Camera released. Back to sleeping mode.")
+        print("==================================================")
+
 
 def main():
-    global streaming_frame, is_camera_on  # Khai báo sử dụng biến toàn cục để chia sẻ dữ liệu
-    
     print("==================================================")
-    print("🌿 SWS CORE SYSTEM - CHẾ ĐỘ TIẾT KIỆM NĂNG LƯỢNG")
+    print("SWS CORE SYSTEM - LOW POWER MODE")
     print("==================================================")
-    
-    # 1. Nạp Model NCNN (Chỉ nạp 1 lần duy nhất vào RAM lúc khởi động)
-    print("[HỆ THỐNG] Đang nạp mô hình YOLO NCNN...")
+
+    print("[SYSTEM] Loading YOLO NCNN model...")
     model = load_yolo_model()
+
     if model is None:
-        print("[LỖI] Không tìm thấy thư mục model NCNN tại models/waste_ncnn!")
+        print("[ERROR] Model folder not found: models/waste_ncnn")
         return
-    print("[HỆ THỐNG] Nạp model thành công! Hệ thống sẵn sàng.")
-    print("[HỆ THỐNG] Chế độ ngủ đông 💤: Đang lắng nghe tín hiệu IR từ ESP32...")
+
+    print("[SYSTEM] Model loaded successfully.")
+    print("[SYSTEM] Sleeping mode: waiting for IR trigger from ESP32...")
 
     try:
         while True:
-            # GIAI ĐOẠN 1: Ngủ đông - Chỉ quét cổng UART để kiểm tra lệnh từ cảm biến IR
-            ser = get_esp32_connection()
-            is_triggered = False
-            
-            if ser and ser.in_waiting > 0:
-                try:
-                    line = ser.readline().decode('utf-8', errors='ignore').strip()
-                    if "CMD_START_CAM" in line:
-                        is_triggered = True
-                except:
-                    pass
+            is_triggered = read_uart_trigger()
 
-            # GIAI ĐOẠN 2: Khi IR phát hiện vật cản -> Đánh thức Camera và AI
             if is_triggered:
-                print("\n🔔 [IR TRIGGER] Phát hiện rác! Đang cấp nguồn bật Camera...")
-                cap = cv2.VideoCapture(0)  # Bắt đầu mở và luồng dữ liệu từ camera
-                
-                if not cap.isOpened():
-                    print("[LỖI] Không thể kết nối với Camera!")
-                    continue
-                
-                # BÁO HIỆU CAMERA LÊN NGUỒN ĐỂ SERVER PHÁT LUỒNG NGẦM
-                with frame_lock:
-                    is_camera_on = True
-                
-                stable_counter = 0
-                last_label = ""
-                start_session_time = time.time()
-                max_session_timeout = 10  # BẢO VỆ: Quá 10 giây không nhận diện xong sẽ tự ngắt Cam
-                
-                while cap.isOpened():
-                    # Cơ chế an toàn tránh treo Camera làm cạn pin xe
-                    if time.time() - start_session_time > max_session_timeout:
-                        print("\n⏳ [TIMEOUT] Không chốt được nhãn ổn định trong 10s. Tự động đóng cam...")
-                        break
-                        
-                    ret, frame = cap.read()
-                    if not ret:
-                        print("[CẢNH BÁO] Mất khung hình từ Camera!")
-                        time.sleep(0.1)
-                        continue
+                run_camera_ai_session(model)
 
-                    # Chạy YOLOv11 NCNN nhận diện vật thể (Lấy thêm biến ảnh annotated đã vẽ khung)
-                    label, prob, annotated = predict_waste(model, frame)
-
-                    # ĐẨY ẢNH ĐÃ XỬ LÝ LÊN RAM ĐỂ FILE MAIN.JS CỦA ÔNG HỐT VỀ VẼ LÊN CANVAS
-                    display_frame = annotated if annotated is not None else frame
-                    with frame_lock:
-                        streaming_frame = display_frame
-
-                    if label and prob is not None and (prob / 100) > CONF_THRESHOLD:
-                        if label == last_label:
-                            stable_counter += 1
-                        else:
-                            stable_counter = 1
-                            last_label = label
-
-                        progress = int((stable_counter / STABLE_FRAMES_REQ) * 100)
-                        print(f"🔍 [AI KHẢO SÁT] Đang phân tích: {label} ({progress}%)", end="\r")
-
-                        # Khi nhãn rác đã đạt độ ổn định liên tục qua 5 khung hình
-                        if stable_counter >= STABLE_FRAMES_REQ:
-                            print(f"\n🚀 [XÁC NHẬN NHÃN] Kết quả: {label} ({prob:.1f}%)")
-                            
-                            # GIAI ĐOẠN 3: Gạt rác và đồng bộ dữ liệu siêu âm HC-SR04
-                            print(f"📤 [UART] Gửi lệnh gạt [{label}] xuống ESP32...")
-                            if send_servo_command(label):
-                                print("⏳ [UART] Đang đợi chu trình cơ khí hoàn tất và phản hồi đo đầy...")
-                                
-                                raw_log = wait_for_esp32_log(timeout=15)
-                                if raw_log:
-                                    try:
-                                        data = raw_log.split(":")[1].split("|")
-                                        d_vals = [float(val) for val in data]
-                                        
-                                        print("📊 [DỮ LIỆU CẢM BIẾN] Trạng thái các ngăn chứa hiện tại:")
-                                        names = ["Hữu cơ", "Vô cơ", "Tái chế", "Khác"]
-                                        
-                                        for i in range(4):
-                                            if d_vals[i] > 0:
-                                                # Logic kiểm tra khoảng cách mặt rác d < 10cm để báo đầy
-                                                status = "🔴 ĐẦY! (CẦN XỬ LÝ)" if d_vals[i] < BIN_FULL_THRESHOLD else "🟢 Còn chỗ"
-                                                print(f"   -> Ngăn {i+1} ({names[i]}): {d_vals[i]} cm | Trạng thái: {status}")
-                                    except:
-                                        print("[LỖI] Sai cấu trúc dữ liệu phản hồi từ board cơ khí.")
-                                else:
-                                    print("❌ [LỖI] Quá thời gian phản hồi (Timeout) từ ESP32!")
-                            
-                            # Xử lý xong lượt rác này -> Thoát ngay vòng lặp Camera
-                            break
-                    else:
-                        stable_counter = 0
-
-                    time.sleep(0.01)  # Giảm tải cho CPU Pi 4 trong luồng nhận diện
-                
-                # NGẮT NGUỒN CAMERA: Giải phóng tài nguyên phần cứng ngay lập tức
-                cap.release()
-                
-                # DỌN SẠCH BỘ NHỚ RAM VÀ KHÓA STREAM KHI CAMERA TẮT
-                with frame_lock:
-                    is_camera_on = False
-                    streaming_frame = None
-                    
-                print("[HỆ THỐNG] Đã giải phóng Camera thành công. Quay lại chế độ ngủ đông... 💤")
-                print("==================================================")
-
-            # Chu kỳ quét UART khi đang ngủ đông - Giảm tải CPU bằng cách tăng thời gian chờ giữa các lần quét
             time.sleep(0.05)
 
     except KeyboardInterrupt:
-        print("\n👋 [HỆ THỐNG] Đã ngắt chương trình chủ động.")
+        print("\n[SYSTEM] Program stopped by user.")
+
+        set_camera_state(False)
+
+        try:
+            ser = get_esp32_connection()
+            close_serial_safely(ser)
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
-    # Luồng phụ: Khởi chạy Flask Server phát luồng ảnh ngầm lên cổng 8085
-    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread = threading.Thread(
+        target=run_flask_server,
+        daemon=True,
+    )
+
     flask_thread.start()
-    
-    # Luồng chính: Khởi chạy bộ điều khiển AI + UART gốc nguyên bản của ông
+
     main()
