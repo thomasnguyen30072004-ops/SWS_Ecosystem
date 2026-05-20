@@ -92,9 +92,9 @@ void sorting_task(void *pvParameters) {
             }
         }
 
-        if (ir_val == 1 && object_present) {
-            object_present = false;
-        }
+        //if (ir_val == 1 && object_present) {
+        //    object_present = false;
+        //}
 
         vTaskDelay(pdMS_TO_TICKS(50)); 
     }
