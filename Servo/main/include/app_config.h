@@ -18,7 +18,8 @@
 // Hệ thống Siêu âm HC-SR04
 #define TRIG_GPIO          18  // Chân phát chung
 #define ECHO_BIN1          10 // Trong
-#define ECHO_BIN2          11 // Ngoai
+// #define ECHO_BIN2          11 // Ngoài
+
 /* --- Ngưỡng khoảng cách (cm) --- */
 #define DIST_THRESHOLD_FULL    10.0  // Bé hơn 10cm là báo đầy
 #define DIST_MAX_RANGE         400.0 // Giới hạn tối đa của cảm biến

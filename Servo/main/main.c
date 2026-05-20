@@ -34,6 +34,8 @@ void sorting_task(void *pvParameters) {
 
         if (object_present && xQueueReceive(xCmdQueue, &cmd, pdMS_TO_TICKS(10))) {
             if (cmd >= '1' && cmd <= '4') {
+                buzzer_beep();
+                vTaskDelay(pdMS_TO_TICKS(100)); // Khoảng nghỉ ngắn giữa 2 tiếng bíp
                 buzzer_beep(); 
 
                 int pan_target = 175; int tilt_target = 90;
@@ -41,7 +43,7 @@ void sorting_task(void *pvParameters) {
 
                 switch (cmd) {
                     case '1': pan_target = 175; tilt_target = 180; active_echo = ECHO_BIN1; break;
-                    case '2': pan_target = 0;   tilt_target = 180; active_echo = ECHO_BIN2; break;
+                    case '2': pan_target = 0;   tilt_target = 180; active_echo = ECHO_BIN1; break;
                     case '3': pan_target = 65;  tilt_target = 180; active_echo = ECHO_BIN1; break; 
                     case '4': pan_target = 175; tilt_target = 0;   active_echo = ECHO_BIN1; break;
                 }
@@ -60,17 +62,26 @@ void sorting_task(void *pvParameters) {
                 vTaskDelay(pdMS_TO_TICKS(1500)); // Đứng yên 1s cho khay hết rung và đo siêu âm
 
                 // Đo khoảng cách 
-                float dist = sensor_get_dist(ECHO_BIN1);
-                // PHÁT TIẾNG BÍP THỨ 2: Báo hiệu đã đo xong mức rác
+               int bin_full = 0;
+               float dist = sensor_get_dist(ECHO_BIN1); 
+                if (dist < DIST_THRESHOLD_FULL) {
+                    bin_full = 1; 
+                }
+
                 buzzer_beep();
 
+                if (bin_full == 1){
+                    printf("BIN_FULL:%c\n", cmd); // Báo Pi thùng đầy
+                }
+                
                 // --- BƯỚC 4: GỬI DỮ LIỆU ĐỊNH DẠNG 4 NGĂN ---
                 // Chỉ gửi giá trị cho ngăn vừa đổ, các ngăn khác gửi 0.0
-                printf("BIN_LOG:%.1f|%.1f|%.1f|%.1f\n", 
-                        (cmd == '1' ? dist : 0.0), 
-                        (cmd == '2' ? dist : 0.0),
-                        (cmd == '3' ? dist : 0.0),
-                        (cmd == '4' ? dist : 0.0));
+                // printf("BIN_LOG:%.1f|%.1f|%.1f|%.1f\n", 
+                //        (cmd == '1' ? dist : 0.0), 
+                //        (cmd == '2' ? dist : 0.0),
+                //        (cmd == '3' ? dist : 0.0),
+                //        (cmd == '4' ? dist : 0.0));
+
                 // --- BƯỚC 4: SAU KHI ĐO XONG MỚI QUAY PAN VỀ HOME ---
                 vTaskDelay(pdMS_TO_TICKS(500));
                 servo_write_angle(SERVO_PAN, 175);

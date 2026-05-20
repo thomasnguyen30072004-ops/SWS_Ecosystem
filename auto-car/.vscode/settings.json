@@ -1,5 +1,5 @@
 {
-    "idf.currentSetup": "Z:/esp_tools/Espressif/frameworks/esp-idf-v5.5.1/",
+    "idf.currentSetup": "C:\\esp\\v6.0\\esp-idf",
     "idf.openOcdConfigs": [
         "board/esp32s3-builtin.cfg"
     ],

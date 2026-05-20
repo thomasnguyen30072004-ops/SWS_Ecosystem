@@ -36,7 +36,7 @@ void sensor_init(void) {
     // 3. Siêu âm HC-SR04
     gpio_set_direction(TRIG_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_direction(ECHO_BIN1, GPIO_MODE_INPUT);
-    gpio_set_direction(ECHO_BIN2, GPIO_MODE_INPUT);
+    // gpio_set_direction(ECHO_BIN2, GPIO_MODE_INPUT);
 }
 
 void buzzer_beep(void) {
