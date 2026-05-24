@@ -27,7 +27,7 @@
 // #define ECHO_BIN4          7 // Thùng Khác 
 
 /* --- Buzzer  --- */
-#define BUZZER_GPIO        13 // Buzzer tích cực (Báo khi nhận diện xong)
+#define BUZZER_GPIO        3 // Buzzer active
 
 
 // LED Trạng thái 
