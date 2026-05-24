@@ -16,7 +16,7 @@
 #define IR_SENSOR_GPIO     6 // Hồng ngoại E18-D80NK
 
 // Hệ thống Siêu âm HC-SR04
-#define TRIG_GPIO          18  // Chân phát chung
+#define TRIG_GPIO          15  // Chân phát chung
 #define ECHO_BIN1          10 // Trong
 // #define ECHO_BIN2          11 // Ngoài
 

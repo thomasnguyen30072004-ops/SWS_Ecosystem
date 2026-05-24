@@ -16,8 +16,8 @@ void sorting_task(void *pvParameters) {
     bool object_present = false; 
 
     // 1. Đưa Robot về vị trí IDLE (Tấm gạt nằm ngang tại vị trí nhận rác)
-    servo_write_angle(SERVO_PAN, 175); 
-    servo_write_angle(SERVO_TILT, 90);
+    servo_write_angle(SERVO_PAN, 174); 
+    servo_write_angle(SERVO_TILT, 85);
 
     vTaskDelay(pdMS_TO_TICKS(2000)); 
 
@@ -38,14 +38,14 @@ void sorting_task(void *pvParameters) {
                 vTaskDelay(pdMS_TO_TICKS(100)); // Khoảng nghỉ ngắn giữa 2 tiếng bíp
                 buzzer_beep(); 
 
-                int pan_target = 175; int tilt_target = 90;
+                int pan_target = 174; int tilt_target = 85;
                 int active_echo = ECHO_BIN1; 
 
                 switch (cmd) {
-                    case '1': pan_target = 175; tilt_target = 180; active_echo = ECHO_BIN1; break;
+                    case '1': pan_target = 174; tilt_target = 180; active_echo = ECHO_BIN1; break;
                     case '2': pan_target = 0;   tilt_target = 180; active_echo = ECHO_BIN1; break;
-                    case '3': pan_target = 65;  tilt_target = 180; active_echo = ECHO_BIN1; break; 
-                    case '4': pan_target = 175; tilt_target = 0;   active_echo = ECHO_BIN1; break;
+                    case '3': pan_target = 55;  tilt_target = 180; active_echo = ECHO_BIN1; break; 
+                    case '4': pan_target = 174; tilt_target = 0;   active_echo = ECHO_BIN1; break;
                 }
 
                 // --- BƯỚC 1: QUAY PAN ĐẾN THÙNG ---
@@ -58,7 +58,7 @@ void sorting_task(void *pvParameters) {
 
                 // --- BƯỚC 3: QUAY TILT VỀ 90 ĐỂ ĐO MỨC RÁC ---
                 // Lúc này khay PAN vẫn đang ở trên miệng thùng rác tương ứng
-                servo_write_angle(SERVO_TILT, 90); 
+                servo_write_angle(SERVO_TILT, 85); 
                 vTaskDelay(pdMS_TO_TICKS(1500)); // Đứng yên 1s cho khay hết rung và đo siêu âm
 
                 // Đo khoảng cách 
@@ -84,7 +84,7 @@ void sorting_task(void *pvParameters) {
 
                 // --- BƯỚC 4: SAU KHI ĐO XONG MỚI QUAY PAN VỀ HOME ---
                 vTaskDelay(pdMS_TO_TICKS(500));
-                servo_write_angle(SERVO_PAN, 175);
+                servo_write_angle(SERVO_PAN, 174);
                 
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 object_present = false; 
