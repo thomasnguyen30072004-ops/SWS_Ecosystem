@@ -13,25 +13,10 @@ void sensor_init(void) {
     };
     gpio_config(&ir_cfg);
 
-    // 2. Khởi tạo PWM cho Buzzer
-    ledc_timer_config_t buz_timer = {
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .timer_num = LEDC_TIMER_0,
-        .duty_resolution = LEDC_TIMER_13_BIT,
-        .freq_hz = 3000, // Tần số 3kHz
-        .clk_cfg = LEDC_AUTO_CLK
-    };
-    ledc_timer_config(&buz_timer);
-
-    ledc_channel_config_t buz_chan = {
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = LEDC_CHANNEL_0,
-        .timer_sel = LEDC_TIMER_0,
-        .gpio_num = BUZZER_GPIO,
-        .duty = 0,
-        .hpoint = 0
-    };
-    ledc_channel_config(&buz_chan);
+    // 2. Khởi tạo cho Buzzer
+    gpio_reset_pin(BUZZER_GPIO);
+    gpio_set_direction(BUZZER_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_level(BUZZER_GPIO, 0); // Kéo xuống mức 0 ban đầu để CHỐNG còi kêu rò lúc vừa bật nguồn
 
     // 3. Siêu âm HC-SR04
     gpio_set_direction(TRIG_GPIO, GPIO_MODE_OUTPUT);
@@ -40,11 +25,9 @@ void sensor_init(void) {
 }
 
 void buzzer_beep(void) {
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 4000); // 50% duty
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-    vTaskDelay(pdMS_TO_TICKS(150));
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+    gpio_set_level(BUZZER_GPIO, 1); // Cấp điện áp HIGH liên tục để kích mạch dao động nội của còi Active hú
+    vTaskDelay(pdMS_TO_TICKS(200)); // Giữ tiếng bíp trong 200ms
+    gpio_set_level(BUZZER_GPIO, 0); // Tắt còi dứt khoát
 }
 
 float sensor_get_dist(int echo_pin) {
