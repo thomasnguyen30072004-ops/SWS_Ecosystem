@@ -27,7 +27,8 @@
 // #define ECHO_BIN4          7 // Thùng Khác 
 
 /* --- Buzzer  --- */
-#define BUZZER_GPIO        3 // Buzzer active
+#define BUZZER_GPIO        13 // Buzzer active
+#define BUZZER_ACTIVE_LEVEL 0 // Cấp HIGH để hú
 
 
 // LED Trạng thái 
