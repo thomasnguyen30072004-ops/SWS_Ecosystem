@@ -30,7 +30,7 @@ is_camera_on = False
 uart_rx_buffer = ""
 
 CONF_THRESHOLD = 0.6
-STABLE_FRAMES_REQ = 5
+STABLE_FRAMES_REQ = 10
 BIN_FULL_THRESHOLD = 10.0
 CAMERA_INDEX = 0
 MAX_SESSION_TIMEOUT = 10
@@ -312,13 +312,21 @@ def run_camera_ai_session(model):
 
         set_camera_state(True)
 
-        stable_counter = 0
-        last_label = ""
+        # --- KHỞI TẠO LOGIC BẦU CHỌN (VOTING LOGIC) ---
+        label_votes = {}       # Dictionary lưu trữ: { "Nhãn_AI": Số_Lượt_Đoán }
+        collected_samples = 0   # Bộ đếm tổng số khung hình hợp lệ thu thập được
         start_session_time = time.time()
+        
+        # Biến lưu trữ khung hình có nhãn cuối cùng để chụp ảnh snapshot lưu web
+        last_valid_frame = None
 
+        display_frame = None
+        
         while cap.isOpened():
+            # Cơ chế an toàn: Nếu quá 10 giây mà không thu thập đủ số khung hình yêu cầu,
+            # hệ thống sẽ tự ngắt và thực hiện bầu chọn trên những gì đã thu thập được.
             if time.time() - start_session_time > MAX_SESSION_TIMEOUT:
-                print("\n[TIMEOUT] No stable label after 10 seconds. Closing camera...")
+                print("\n[TIMEOUT] Session timeout reached. Processing collected votes...")
                 break
 
             ret, frame = cap.read()
@@ -333,32 +341,42 @@ def run_camera_ai_session(model):
             display_frame = annotated if annotated is not None else frame
             update_streaming_frame(display_frame)
 
+            # Chỉ chấp nhận tính điểm bầu chọn cho những khung hình vượt ngưỡng tin cậy
             if label and prob is not None and (prob / 100) > CONF_THRESHOLD:
-                if label == last_label:
-                    stable_counter += 1
-                else:
-                    stable_counter = 1
-                    last_label = label
-
-                progress = int((stable_counter / STABLE_FRAMES_REQ) * 100)
+                # Cộng thêm 1 phiếu bầu cho nhãn này vào từ điển
+                label_votes[label] = label_votes.get(label, 0) + 1
+                collected_samples += 1
+                last_valid_frame = display_frame.copy()
 
                 print(
-                    f"[AI] Analyzing: {label} ({progress}%)",
+                    f"[AI] Sampling: Collected {collected_samples}/{STABLE_FRAMES_REQ} valid frames... (Current: {label})",
                     end="\r",
                 )
 
-                if stable_counter >= STABLE_FRAMES_REQ:
-                    print(f"\n[AI RESULT] Label confirmed: {label} ({prob:.1f}%)")
-
-                    update_latest_snapshot(display_frame, label)
-                    handle_esp32_after_detection(label)
-
+                # Khi đã thu thập đủ tổng số mẫu cần thiết (Ví dụ: 5 hoặc 10 khung hình hợp lệ)
+                if collected_samples >= STABLE_FRAMES_REQ:
                     break
-
             else:
-                stable_counter = 0
+                # Khung hình không đủ độ tin cậy hoặc không có rác, bỏ qua không tính điểm vote
+                pass
 
             time.sleep(0.01)
+
+        # --- QUY TRÌNH THỐNG KÊ VÀ TRÍCH XUẤT NHÃN CHIẾM ĐA SỐ ---
+        if label_votes:
+            # Dùng hàm max() bốc ra nhãn có giá trị (Value/Số phiếu) lớn nhất trong Dictionary
+            final_label = max(label_votes, key=lambda k: label_votes[k])
+            
+            print(f"\n[AI RESULT] Voting detailed statistics: {label_votes}")
+            print(f"[AI RESULT] Final Winner confirmed: {final_label} ({label_votes[final_label]}/{collected_samples} frames)")
+
+            # Cập nhật ảnh snapshot lên web dashboard và bắn lệnh cơ khí xuống cho ESP32-S3
+            snap_frame = last_valid_frame if last_valid_frame is not None else display_frame
+            update_latest_snapshot(snap_frame, final_label)
+            handle_esp32_after_detection(final_label)
+            
+        else:
+            print("\n[AI RESULT] No valid labels detected above confidence threshold during this session.")
 
     except Exception as e:
         print(f"[CAMERA ERROR] Camera session failed: {e}")
