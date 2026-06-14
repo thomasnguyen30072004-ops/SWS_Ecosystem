@@ -16,19 +16,19 @@
 #define IR_SENSOR_GPIO     6 // Hồng ngoại E18-D80NK
 
 // Hệ thống Siêu âm HC-SR04
-#define TRIG_GPIO          15  // Chân phát chung
+#define TRIG_GPIO          9  // Chân phát chung
 #define ECHO_BIN1          10 // Trong
 // #define ECHO_BIN2          11 // Ngoài
 
 /* --- Ngưỡng khoảng cách (cm) --- */
-#define DIST_THRESHOLD_FULL    10.0  // Bé hơn 10cm là báo đầy
+#define DIST_THRESHOLD_FULL    15.0  // Bé hơn 15cm là báo đầy
 #define DIST_MAX_RANGE         400.0 // Giới hạn tối đa của cảm biến
 // #define ECHO_BIN3          6 // Thùng Tái chế
 // #define ECHO_BIN4          7 // Thùng Khác 
 
 /* --- Buzzer  --- */
 #define BUZZER_GPIO        13 // Buzzer active
-#define BUZZER_ACTIVE_LEVEL 0 // Cấp HIGH để hú
+#define BUZZER_ACTIVE_LEVEL 1 // Cấp HIGH để hú
 
 
 // LED Trạng thái 

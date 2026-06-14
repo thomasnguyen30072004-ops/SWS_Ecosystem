@@ -16,8 +16,8 @@ void sorting_task(void *pvParameters) {
     bool object_present = false; 
 
     // 1. Đưa Robot về vị trí IDLE (Tấm gạt nằm ngang tại vị trí nhận rác)
-    servo_write_angle(SERVO_PAN, 165); 
-    servo_write_angle(SERVO_TILT, 83);
+    servo_write_angle(SERVO_PAN, 180); 
+    servo_write_angle(SERVO_TILT, 92);
 
     vTaskDelay(pdMS_TO_TICKS(2000)); 
 
@@ -27,7 +27,12 @@ void sorting_task(void *pvParameters) {
         if (ir_val == 0 && !object_present) {
             vTaskDelay(pdMS_TO_TICKS(50)); 
             if (gpio_get_level(IR_SENSOR_GPIO) == 0) {
-                printf("CMD_START_CAM\n"); // Báo Pi bật Camera
+                buzzer_beep();
+                
+                //Thêm fflush để Pi 4 nhận được lệnh bật Cam ngay lập tức
+                printf("CMD_START_CAM\n"); 
+                fflush(stdout); 
+                
                 object_present = true; 
             }
         }
@@ -38,14 +43,14 @@ void sorting_task(void *pvParameters) {
                 vTaskDelay(pdMS_TO_TICKS(100)); // Khoảng nghỉ ngắn giữa 2 tiếng bíp
                 buzzer_beep(); 
 
-                int pan_target = 165; int tilt_target = 83;
+                int pan_target = 180; int tilt_target = 92;
                 int active_echo = ECHO_BIN1; 
 
                 switch (cmd) {
-                    case '1': pan_target = 165; tilt_target = 180; active_echo = ECHO_BIN1; break;
-                    case '2': pan_target = 0;   tilt_target = 180; active_echo = ECHO_BIN1; break;
-                    case '3': pan_target = 70;  tilt_target = 180; active_echo = ECHO_BIN1; break; 
-                    case '4': pan_target = 165; tilt_target = 0;   active_echo = ECHO_BIN1; break;
+                    case '1': pan_target = 180; tilt_target = 180; active_echo = ECHO_BIN1; break;
+                    case '2': pan_target = 10;   tilt_target = 160; active_echo = ECHO_BIN1; break;
+                    case '3': pan_target = 97;  tilt_target = 160; active_echo = ECHO_BIN1; break; 
+                    case '4': pan_target = 180; tilt_target = 0;   active_echo = ECHO_BIN1; break;
                 }
 
                 // --- BƯỚC 1: QUAY PAN ĐẾN THÙNG ---
@@ -57,34 +62,32 @@ void sorting_task(void *pvParameters) {
                 vTaskDelay(pdMS_TO_TICKS(1000)); // Chờ rác rơi hết
 
                 // --- BƯỚC 3: QUAY TILT VỀ 90 ĐỂ ĐO MỨC RÁC ---
-                // Lúc này khay PAN vẫn đang ở trên miệng thùng rác tương ứng
-                servo_write_angle(SERVO_TILT, 83); 
-                vTaskDelay(pdMS_TO_TICKS(1500)); // Đứng yên 1s cho khay hết rung và đo siêu âm
+                servo_write_angle(SERVO_TILT, 92); 
+                vTaskDelay(pdMS_TO_TICKS(1500)); // Đứng yên 1.5s cho khay hết rung và đo siêu âm
 
-                // Đo khoảng cách 
-               int bin_full = 0;
-               float dist = sensor_get_dist(ECHO_BIN1); 
-                if (dist < DIST_THRESHOLD_FULL) {
+                // Đo khoảng cách thực tế
+                int bin_full = 0;
+                float dist = sensor_get_dist(active_echo); 
+                
+                // ĐÃ SỬA CHÍ MẠNG: Chỉ xét đầy khi khoảng cách hợp lệ (> 0.0f) để né mã lỗi -1.0f của cảm biến
+                if (dist > 0.0f && dist < DIST_THRESHOLD_FULL) {
                     bin_full = 1; 
                 }
 
                 buzzer_beep();
 
+                // ĐÃ CHUẨN HÓA GIAO TIẾP VÒNG KÍN VỚI PI 4:
                 if (bin_full == 1){
-                    printf("BIN_FULL:%c\n", cmd); // Báo Pi thùng đầy
+                    printf("BIN_FULL:%c\n", cmd); // Báo Pi thùng đầy để kích hoạt xe AGV
+                    fflush(stdout);               // Ép đẩy dữ liệu đi ngay không giữ trong bộ đệm RAM
+                } else {
+                    printf("BIN_AVAILABLE\n");    // Báo Pi thùng còn chỗ để Pi đóng Cam tắt luồng đi ngủ ngay
+                    fflush(stdout);
                 }
-                
-                // --- BƯỚC 4: GỬI DỮ LIỆU ĐỊNH DẠNG 4 NGĂN ---
-                // Chỉ gửi giá trị cho ngăn vừa đổ, các ngăn khác gửi 0.0
-                // printf("BIN_LOG:%.1f|%.1f|%.1f|%.1f\n", 
-                //        (cmd == '1' ? dist : 0.0), 
-                //        (cmd == '2' ? dist : 0.0),
-                //        (cmd == '3' ? dist : 0.0),
-                //        (cmd == '4' ? dist : 0.0));
 
                 // --- BƯỚC 4: SAU KHI ĐO XONG MỚI QUAY PAN VỀ HOME ---
                 vTaskDelay(pdMS_TO_TICKS(500));
-                servo_write_angle(SERVO_PAN, 165);
+                servo_write_angle(SERVO_PAN, 180);
                 
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 object_present = false; 
@@ -105,7 +108,6 @@ void uart_rx_task(void *pvParameters) {
     char cmd;
     while (1) {
         if (uart_receive_cmd(&cmd)) {
-            
             xQueueSend(xCmdQueue, &cmd, portMAX_DELAY);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
