@@ -15,7 +15,7 @@ void sorting_task(void *pvParameters) {
     char cmd;
     bool object_present = false; 
 
-    // 1. Đưa Robot về vị trí IDLE (Tấm gạt nằm ngang tại vị trí nhận rác)
+    // Đưa về vị trí Start (Tấm gạt nằm ngang tại vị trí nhận rác)
     servo_write_angle(SERVO_PAN, 180); 
     servo_write_angle(SERVO_TILT, 92);
 
@@ -53,15 +53,15 @@ void sorting_task(void *pvParameters) {
                     case '4': pan_target = 180; tilt_target = 0;   active_echo = ECHO_BIN1; break;
                 }
 
-                // --- BƯỚC 1: QUAY PAN ĐẾN THÙNG ---
+                // --- QUAY PAN ĐẾN THÙNG ---
                 servo_write_angle(SERVO_PAN, pan_target);
                 vTaskDelay(pdMS_TO_TICKS(1000));
 
-                // --- BƯỚC 2: QUAY TILT ĐỂ GẠT RÁC ---
+                // --- QUAY TILT ĐỂ GẠT RÁC ---
                 servo_write_angle(SERVO_TILT, tilt_target);
                 vTaskDelay(pdMS_TO_TICKS(1000)); // Chờ rác rơi hết
 
-                // --- BƯỚC 3: QUAY TILT VỀ 90 ĐỂ ĐO MỨC RÁC ---
+                // --- QUAY TILT VỀ 90 ĐỂ ĐO MỨC RÁC ---
                 servo_write_angle(SERVO_TILT, 92); 
                 vTaskDelay(pdMS_TO_TICKS(1500)); // Đứng yên 1.5s cho khay hết rung và đo siêu âm
 
@@ -69,14 +69,13 @@ void sorting_task(void *pvParameters) {
                 int bin_full = 0;
                 float dist = sensor_get_dist(active_echo); 
                 
-                // ĐÃ SỬA CHÍ MẠNG: Chỉ xét đầy khi khoảng cách hợp lệ (> 0.0f) để né mã lỗi -1.0f của cảm biến
+                // Kiểm tra nếu khoảng cách đo được nhỏ hơn ngưỡng thì báo thùng đầy
                 if (dist > 0.0f && dist < DIST_THRESHOLD_FULL) {
                     bin_full = 1; 
                 }
 
                 buzzer_beep();
 
-                // ĐÃ CHUẨN HÓA GIAO TIẾP VÒNG KÍN VỚI PI 4:
                 if (bin_full == 1){
                     printf("BIN_FULL:%c\n", cmd); // Báo Pi thùng đầy để kích hoạt xe AGV
                     fflush(stdout);               // Ép đẩy dữ liệu đi ngay không giữ trong bộ đệm RAM
@@ -85,7 +84,7 @@ void sorting_task(void *pvParameters) {
                     fflush(stdout);
                 }
 
-                // --- BƯỚC 4: SAU KHI ĐO XONG MỚI QUAY PAN VỀ HOME ---
+                // --- SAU KHI ĐO XONG MỚI QUAY PAN VỀ HOME ---
                 vTaskDelay(pdMS_TO_TICKS(500));
                 servo_write_angle(SERVO_PAN, 180);
                 
