@@ -81,7 +81,7 @@ void sorting_task(void *pvParameters) {
                     printf("BIN_FULL:%c\n", cmd); // Báo Pi thùng đầy để kích hoạt xe AGV
                     fflush(stdout);               // Ép đẩy dữ liệu đi ngay không giữ trong bộ đệm RAM
                 } else {
-                    printf("BIN_AVAILABLE\n");    // Báo Pi thùng còn chỗ để Pi đóng Cam tắt luồng đi ngủ ngay
+                    printf("BIN_AVAILABLE:%c\n", cmd);    // Báo Pi thùng còn chỗ để Pi đóng Cam tắt luồng đi ngủ ngay
                     fflush(stdout);
                 }
 
