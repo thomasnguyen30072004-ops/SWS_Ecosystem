@@ -14,6 +14,7 @@ idf_component_register(
         esp_driver_mcpwm      # Cho Servo
         esp_driver_uart       # Cho UART
         esp_timer             # Cho Siêu âm
+        esp_adc               # ADC
         log                   # Cho việc xuất log ESP_LOGI
         driver
 )

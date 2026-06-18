@@ -26,6 +26,24 @@
 // #define ECHO_BIN3          6 // Thùng Tái chế
 // #define ECHO_BIN4          7 // Thùng Khác 
 
+#define BATTERY_ADC_GPIO 12
+
+#define BATTERY_R1_OHM 19630.0f
+#define BATTERY_R2_OHM 4657.0f
+
+#define BATTERY_DIVIDER_FACTOR \
+    ((BATTERY_R1_OHM + BATTERY_R2_OHM) / BATTERY_R2_OHM)
+
+#define BATTERY_ADC_SAMPLE_COUNT 32
+#define BATTERY_READ_PERIOD_MS   10000
+
+#define BATTERY_ADC_GAIN      1.0000f
+#define BATTERY_ADC_OFFSET_MV 0.0f
+
+#define BATTERY_STOP_VOUT_MV      2454
+#define BATTERY_RECOVER_VOUT_MV   2493
+#define BATTERY_LOW_CONFIRM_COUNT 3
+
 /* --- Buzzer  --- */
 #define BUZZER_GPIO        13 // Buzzer active
 #define BUZZER_ACTIVE_LEVEL 1 // Cấp HIGH để hú

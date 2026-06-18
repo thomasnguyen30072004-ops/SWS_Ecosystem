@@ -44,13 +44,12 @@ void sorting_task(void *pvParameters) {
                 buzzer_beep(); 
 
                 int pan_target = 180; int tilt_target = 92;
-                int active_echo = ECHO_BIN1; 
 
                 switch (cmd) {
-                    case '1': pan_target = 180; tilt_target = 180; active_echo = ECHO_BIN1; break;
-                    case '2': pan_target = 10;   tilt_target = 160; active_echo = ECHO_BIN1; break;
-                    case '3': pan_target = 97;  tilt_target = 160; active_echo = ECHO_BIN1; break; 
-                    case '4': pan_target = 180; tilt_target = 0;   active_echo = ECHO_BIN1; break;
+                    case '1': pan_target = 165; tilt_target = 180; break;
+                    case '2': pan_target = 0;   tilt_target = 180; break;
+                    case '3': pan_target = 70;  tilt_target = 180; break; 
+                    case '4': pan_target = 165; tilt_target = 0;   break;
                 }
 
                 // --- QUAY PAN ĐẾN THÙNG ---
@@ -67,7 +66,7 @@ void sorting_task(void *pvParameters) {
 
                 // Đo khoảng cách thực tế
                 int bin_full = 0;
-                float dist = sensor_get_dist(active_echo); 
+                float dist = sensor_get_dist(ECHO_BIN1); 
                 
                 // Kiểm tra nếu khoảng cách đo được nhỏ hơn ngưỡng thì báo thùng đầy
                 if (dist > 0.0f && dist < DIST_THRESHOLD_FULL) {
@@ -118,12 +117,14 @@ void app_main(void) {
     servo_init_hardware(); 
     uart_init_handler(); 
     sensor_init();
+    ESP_ERROR_CHECK(battery_adc_init());
     
     xCmdQueue = xQueueCreate(10, sizeof(char));
 
     // Tao cac Task
     xTaskCreate(uart_rx_task, "UART_RX", 4096, NULL, 10, NULL);
     xTaskCreate(sorting_task, "SORTER", 4096, NULL, 5, NULL);
+    xTaskCreate(battery_monitor_task, "BATTERY", 4096, NULL, 4, NULL);
 
     ESP_LOGI(TAG, "SWS System Started!");
 }
