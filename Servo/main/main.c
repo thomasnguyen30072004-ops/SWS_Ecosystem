@@ -46,10 +46,10 @@ void sorting_task(void *pvParameters) {
                 int pan_target = 180; int tilt_target = 92;
 
                 switch (cmd) {
-                    case '1': pan_target = 165; tilt_target = 180; break;
+                    case '1': pan_target = 180; tilt_target = 180; break;
                     case '2': pan_target = 0;   tilt_target = 180; break;
-                    case '3': pan_target = 70;  tilt_target = 180; break; 
-                    case '4': pan_target = 165; tilt_target = 0;   break;
+                    case '3': pan_target = 90;  tilt_target = 150; break; 
+                    case '4': pan_target = 180; tilt_target = 0;   break;
                 }
 
                 // --- QUAY PAN ĐẾN THÙNG ---
@@ -73,12 +73,14 @@ void sorting_task(void *pvParameters) {
                     bin_full = 1; 
                 }
 
-                buzzer_beep();
+                // buzzer_beep();
 
                 if (bin_full == 1){
+                    buzzer_long_beep();
                     printf("BIN_FULL:%c\n", cmd); // Báo Pi thùng đầy để kích hoạt xe AGV
                     fflush(stdout);               // Ép đẩy dữ liệu đi ngay không giữ trong bộ đệm RAM
                 } else {
+                    buzzer_beep();
                     printf("BIN_AVAILABLE:%c\n", cmd);    // Báo Pi thùng còn chỗ để Pi đóng Cam tắt luồng đi ngủ ngay
                     fflush(stdout);
                 }

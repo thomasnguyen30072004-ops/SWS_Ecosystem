@@ -40,4 +40,6 @@ void buzzer_beep(void);
 // Task FreeRTOS chạy ngầm để giám sát rác vào và mức đầy thùng
 float sensor_get_dist(int echo_pin);
 
+void buzzer_long_beep(void);
+
 #endif

@@ -259,6 +259,12 @@ esp_err_t battery_read(battery_data_t *data)
     data->percent = battery_percent_from_vout(vout_mv);
     data->below_stop_threshold = (vout_mv <= BATTERY_STOP_VOUT_MV);
 
+    // Giả lập pin đầy (Vin ~ 13.3V)
+    // data->vout_mv = 2550; data->percent = 90; data->below_stop_threshold = false;
+    
+    // Giả lập PIN YẾU CHẠY CÒI HÚ (Vin ~ 12.6V < Ngưỡng dừng 12.8V)
+    // data->vout_mv = 2416; data->percent = 5; data->below_stop_threshold = true;
+
     return ESP_OK;
 }
 
@@ -267,63 +273,84 @@ bool battery_is_low(void)
     return s_battery_low;
 }
 
+
 void battery_monitor_task(void *pvParameters)
 {
     (void)pvParameters;
-
     uint8_t low_count = 0;
     bool low_message_sent = false;
+    
+    uint32_t read_counter = 0; // Đếm chu kỳ đọc dữ liệu pin (10 giây)
+    uint32_t beep_counter = 0; // Đếm chu kỳ hú còi báo pin yếu (5 giây)
 
     while (1) {
-        battery_data_t battery;
-        esp_err_t ret = battery_read(&battery);
+        // 1. Kiểm tra đọc và gửi dữ liệu điện áp pin định kỳ mỗi 10 giây (BATTERY_READ_PERIOD_MS)
+        if (read_counter == 0) {
+            battery_data_t battery;
+            esp_err_t ret = battery_read(&battery);
 
-        if (ret == ESP_OK) {
-            // Gói dữ liệu bình thường gửi về Raspberry Pi
-            printf("BATTERY:VIN=%.3f|VOUT=%.3f|PERCENT=%u\n",
-                   battery.vin_v,
-                   battery.vout_v,
-                   (unsigned)battery.percent);
+            if (ret == ESP_OK) {
+                // ÉP XẢ BỘ ĐỆM: Thêm fflush để đẩy dữ liệu pin ngay lên RAM của Pi 4 xử lý
+                printf("BATTERY:VIN=%.3f|VOUT=%.3f|PERCENT=%u\n",
+                       battery.vin_v, battery.vout_v, (unsigned)battery.percent);
+                fflush(stdout);
 
-            if (!s_battery_low) {
-                if (battery.vout_mv <= BATTERY_STOP_VOUT_MV) {
-                    if (low_count < BATTERY_LOW_CONFIRM_COUNT) {
-                        ++low_count;
+                if (!s_battery_low) {
+                    if (battery.vout_mv <= BATTERY_STOP_VOUT_MV) {
+                        if (low_count < BATTERY_LOW_CONFIRM_COUNT) ++low_count;
+                    } else {
+                        low_count = 0;
                     }
-                } else {
+
+                    if (low_count >= BATTERY_LOW_CONFIRM_COUNT) {
+                        s_battery_low = true;
+                        if (!low_message_sent) {
+                            printf("BATTERY_LOW:VIN=%.3f|VOUT=%.3f|PERCENT=%u\n",
+                                   battery.vin_v, battery.vout_v, (unsigned)battery.percent);
+                            fflush(stdout);
+                            low_message_sent = true;
+                        }
+                    }
+                } else if (battery.vout_mv >= BATTERY_RECOVER_VOUT_MV) {
+                    s_battery_low = false;
                     low_count = 0;
+                    low_message_sent = false;
+
+                    printf("BATTERY_RECOVERED:VIN=%.3f|VOUT=%.3f|PERCENT=%u\n",
+                           battery.vin_v, battery.vout_v, (unsigned)battery.percent);
+                    fflush(stdout);
                 }
-
-                if (low_count >= BATTERY_LOW_CONFIRM_COUNT) {
-                    s_battery_low = true;
-
-                    if (!low_message_sent) {
-                        printf("BATTERY_LOW:VIN=%.3f|VOUT=%.3f|PERCENT=%u\n",
-                               battery.vin_v,
-                               battery.vout_v,
-                               (unsigned)battery.percent);
-                        low_message_sent = true;
-                    }
-                }
-            } else if (battery.vout_mv >= BATTERY_RECOVER_VOUT_MV) {
-                // Chỉ thoát trạng thái pin yếu khi Vin đã lên khoảng 13.0 V
-                s_battery_low = false;
-                low_count = 0;
-                low_message_sent = false;
-
-                printf("BATTERY_RECOVERED:VIN=%.3f|VOUT=%.3f|PERCENT=%u\n",
-                       battery.vin_v,
-                       battery.vout_v,
-                       (unsigned)battery.percent);
+            } else {
+                ESP_LOGW(TAG, "Battery ADC read failed: %s", esp_err_to_name(ret));
             }
-        } else {
-            ESP_LOGW(TAG, "Battery ADC read failed: %s", esp_err_to_name(ret));
         }
 
-        vTaskDelay(pdMS_TO_TICKS(BATTERY_READ_PERIOD_MS));
+        // Tăng bộ đếm chu kỳ đọc pin (Đạt mức 10 chu kỳ = 10 giây)
+        read_counter = (read_counter + 1) % (BATTERY_READ_PERIOD_MS / 1000);
+
+        // 2. XỬ LÝ ÂM THANH YÊU CẦU: Cảnh báo hết pin bằng còi hú (beep beep => 5s => beep beep)
+        if (s_battery_low) {
+            if (beep_counter == 0) {
+                // Phát âm bíp kép liên tiếp dứt khoát
+                gpio_set_level(BUZZER_GPIO, BUZZER_ACTIVE_LEVEL); 
+                vTaskDelay(pdMS_TO_TICKS(150)); 
+                gpio_set_level(BUZZER_GPIO, !BUZZER_ACTIVE_LEVEL); 
+                vTaskDelay(pdMS_TO_TICKS(100)); // Khoảng nghỉ ngắn giữa 2 tiếng bíp
+                gpio_set_level(BUZZER_GPIO, BUZZER_ACTIVE_LEVEL); 
+                vTaskDelay(pdMS_TO_TICKS(150)); 
+                gpio_set_level(BUZZER_GPIO, !BUZZER_ACTIVE_LEVEL); 
+
+                beep_counter = 2; // Khóa đếm ngược chặn lại đúng 2 giây tiếp theo mới hú lại
+            } else {
+                beep_counter--;
+            }
+        } else {
+            beep_counter = 0;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Đập nhịp tuần tự 1 giây một lần
     }
 }
-
 /////////////////////////////////////////
 
 void buzzer_beep(void) {
@@ -334,6 +361,12 @@ void buzzer_beep(void) {
     vTaskDelay(pdMS_TO_TICKS(200)); 
     
     // Tắt còi dứt khoát
+    gpio_set_level(BUZZER_GPIO, !BUZZER_ACTIVE_LEVEL); 
+}
+
+void buzzer_long_beep(void) {
+    gpio_set_level(BUZZER_GPIO, BUZZER_ACTIVE_LEVEL); 
+    vTaskDelay(pdMS_TO_TICKS(3000)); // Kéo dài thời gian hú còi lên 1000ms
     gpio_set_level(BUZZER_GPIO, !BUZZER_ACTIVE_LEVEL); 
 }
 
