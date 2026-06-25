@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lịch Sử - Hệ Thống Quản Lý Xe Tự Hành</title>
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="images/logo.png" />
+    <link rel="shortcut icon" href="images/logo.png" />
+    <link rel="apple-touch-icon" href="images/logo.png" />
 
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
@@ -13,13 +17,19 @@
     <div id="loginOverlay" class="login-overlay active">
       <div class="login-container">
         <div class="login-header">
-          <h1>🚀Quản Lý Xe Tự Hành tích hợp xử lý rác</h1>
-          <p>Phân Loại & Thu Gom Rác Thải Thông Minh</p>
+          <h1>
+            <img
+              src="images/icon_login.png"
+              alt="Login"
+              class="inline-icon login-inline"
+            />
+            Quản Lý Xe Tự Hành tích hợp phân loại rác thải
+          </h1>
         </div>
 
         <form id="loginForm" class="login-form">
           <div class="form-group">
-            <label for="username">Tài Khoản Quản Trị</label>
+            <label for="username">Tài Khoản Quản Trị Viên</label>
             <input
               type="text"
               id="username"
@@ -38,11 +48,13 @@
             />
           </div>
 
-          <button type="submit" class="login-btn">Đăng Nhập</button>
+          <button type="submit" class="login-btn green-gradient">
+            Đăng Nhập
+          </button>
         </form>
 
         <div class="login-footer">
-          <p>Demo: admin / 12345</p>
+          <p>Account: admin / 12345</p>
         </div>
       </div>
     </div>
@@ -56,8 +68,10 @@
       <!-- Header -->
       <header class="dashboard-header">
         <div class="header-left">
-          <h1>📊 Lịch Sử & Thống Kê</h1>
-          <p id="systemStatus" class="system-status">● Hệ Thống: Hoạt Động</p>
+          <h1>
+            <img src="images/icon_history.png" alt="Logo" class="header-icon" />
+            Lịch Sử & Thống Kê
+          </h1>
         </div>
         <div class="header-right">
           <span id="userName" class="user-info"></span>
@@ -67,7 +81,12 @@
 
           <div class="dashboard-controls">
             <button id="historyNavBtn" class="history-nav-btn">
-              📊 Lịch Sử
+              <img
+                src="images/icon_history.png"
+                alt="History"
+                class="inline-icon ctrl-icon"
+              />
+              Lịch Sử
             </button>
 
             <!-- Hamburger menu (adjacent to history) -->
@@ -79,72 +98,73 @@
 
             <div id="headerMenu" class="header-menu" aria-hidden="true">
               <button id="themeToggleBtn" class="menu-item">
-                🌗 Chuyển giao diện
+                <img
+                  src="images/icon_mode.png"
+                  alt="Mode"
+                  class="inline-icon icon-mode"
+                />
+                Chuyển giao diện
               </button>
-              <button id="logoutBtn" class="menu-item">Đăng Xuất</button>
+              <button id="logoutBtn" class="menu-item">
+                <img
+                  src="images/icon_logout.png"
+                  alt="Logout"
+                  class="inline-icon icon-logout"
+                />
+                Đăng Xuất
+              </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main class="dashboard-content" style="display: block; overflow-y: auto">
+      <main class="dashboard-content history-content">
         <!-- History Section Full Page -->
-        <div
-          class="history-section active"
-          style="max-width: 1200px; margin: 0 auto"
-        >
+        <div class="history-section active">
           <div class="history-tabs">
             <button
-              class="history-tab-btn active"
-              data-tab="trips"
-              id="tabTrips"
-            >
-              📍 Chuyến Đi
-            </button>
-            <button
-              class="history-tab-btn"
+              class="history-tab-btn active green-gradient"
               data-tab="activities"
               id="tabActivities"
             >
               📋 Hoạt Động
             </button>
-            <button class="history-tab-btn" data-tab="stats" id="tabStats">
+            <button
+              class="history-tab-btn green-gradient"
+              data-tab="stats"
+              id="tabStats"
+            >
               📈 Thống Kê
             </button>
           </div>
 
-          <!-- Tab 1: Trip History -->
-          <div class="history-content active" id="tripsContent">
-            <div class="history-list" id="tripsList">
-              <p class="empty-message">Chưa có chuyến đi nào</p>
-            </div>
-          </div>
-
-          <!-- Tab 2: Activity History -->
-          <div class="history-content" id="activitiesContent">
+          <!-- Activity History -->
+          <div class="history-content active" id="activitiesContent">
             <div class="history-list" id="activitiesList">
               <p class="empty-message">Chưa có hoạt động nào</p>
             </div>
           </div>
 
-          <!-- Tab 3: Statistics -->
+          <!-- Statistics -->
           <div class="history-content" id="statsContent">
             <div class="stats-grid">
+              <!-- Removed total trips, distance, total trash as requested -->
+              <!-- Thời Gian Hoạt Động removed (moved to dashboard battery widget) -->
               <div class="stat-card">
-                <label>Tổng Chuyến Đi</label>
-                <span id="statTotalTrips">0</span>
+                <label>Vô Cơ (lần)</label>
+                <span id="statInorganicCount">0</span>
               </div>
               <div class="stat-card">
-                <label>Tổng Khoảng Cách</label>
-                <span id="statTotalDistance">0 km</span>
+                <label>Hữu Cơ (lần)</label>
+                <span id="statOrganicCount">0</span>
               </div>
               <div class="stat-card">
-                <label>Rác Thu Gom</label>
-                <span id="statTotalTrash">0 kg</span>
+                <label>Tái Chế (lần)</label>
+                <span id="statRecycleCount">0</span>
               </div>
               <div class="stat-card">
-                <label>Thời Gian Hoạt Động</label>
-                <span id="statTotalTime">0 h</span>
+                <label>Khác (lần)</label>
+                <span id="statOtherCount">0</span>
               </div>
             </div>
           </div>
@@ -153,13 +173,13 @@
           <div class="history-actions">
             <button
               id="clearHistoryBtn"
-              class="history-action-btn clear-action"
+              class="history-action-btn clear-action green-gradient"
             >
               🗑️ Xóa Lịch Sử
             </button>
             <button
               id="exportHistoryBtn"
-              class="history-action-btn export-action"
+              class="history-action-btn export-action green-gradient"
             >
               📥 Xuất CSV
             </button>
@@ -179,7 +199,6 @@
       </footer>
     </div>
 
-    <script type="module" src="js/firebase.js"></script>
     <script src="main.js"></script>
   </body>
 </html>

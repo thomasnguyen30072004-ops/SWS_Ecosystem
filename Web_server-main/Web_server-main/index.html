@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hệ Thống Quản Lý Xe Tự Hành Phân Loại Rác</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="images/logo.png" />
+    <link rel="shortcut icon" href="images/logo.png" />
+    <link rel="apple-touch-icon" href="images/logo.png" />
+
+    <!-- Single bundled CSS -->
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+  </head>
+  <body>
+    <!-- ==================== LOGIN OVERLAY ==================== -->
+    <div id="loginOverlay" class="login-overlay active">
+      <div class="login-container">
+        <div class="login-header">
+          <h1>
+            <img
+              src="images/icon_login.png"
+              alt="Login"
+              class="inline-icon login-inline"
+            />
+            Quản Lý Xe Tự Hành tích hợp phân loại rác thải
+          </h1>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label for="username">Tài Khoản Quản Trị</label>
+            <input
+              type="text"
+              id="username"
+              placeholder="Nhập tài khoản"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Mật Khẩu</label>
+            <input
+              type="password"
+              id="password"
+              placeholder="Nhập mật khẩu"
+              required
+            />
+          </div>
+
+          <button type="submit" class="login-btn green-gradient">
+            Đăng Nhập
+          </button>
+        </form>
+
+        <div class="login-footer">
+          <p>Account: admin / 12345</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TRASH FULL WARNING OVERLAY ==================== -->
+    <div id="trashFullOverlay" class="login-overlay" style="display: none; z-index: 9999;">
+      <div class="login-container" style="text-align: center; border: 2px solid var(--danger-color); max-width: 450px;">
+        <div class="login-header">
+          <h1 style="color: var(--danger-color); justify-content: center; font-size: 22px;">
+            ⚠️ CẢNH BÁO
+          </h1>
+        </div>
+        <div style="font-size: 18px; margin-bottom: 20px; font-weight: bold; color: var(--text-primary);">
+          Phát hiện thùng rác đã đầy:
+        </div>
+        <div id="fullBinsList" style="font-size: 20px; color: var(--danger-color); margin-bottom: 30px; font-weight: bold; line-height: 1.6;">
+          <!-- list of full bins -->
+        </div>
+        <button id="closeTrashWarningBtn" class="login-btn green-gradient" style="background: var(--danger-color);">Đã Hiểu</button>
+      </div>
+    </div>
+
+    <!-- ==================== MAIN DASHBOARD ==================== -->
+    <div id="mainDashboard" class="dashboard">
+      <!-- Header -->
+      <header class="dashboard-header">
+        <div class="header-left">
+          <h1>
+            <img
+              src="images/icon_dashboard.png"
+              alt="Dashboard"
+              class="inline-icon icon-dashboard"
+            />
+            Dashboard Quản Lý
+          </h1>
+        </div>
+        <div class="header-right">
+          <span id="userName" class="user-info"></span>
+          <span id="firebaseStatus" class="firebase-status disconnected"
+            >Disconnected</span
+          >
+
+          <div class="dashboard-controls">
+            <button id="historyNavBtn" class="history-nav-btn green-gradient">
+              <img
+                src="images/icon_history.png"
+                alt="History"
+                class="inline-icon ctrl-icon"
+              />
+              Lịch Sử
+            </button>
+
+            <!-- Hamburger menu (adjacent to history) -->
+            <button id="headerMenuBtn" class="menu-btn" aria-label="Mở menu">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </button>
+
+            <div id="headerMenu" class="header-menu" aria-hidden="true">
+              <button id="themeToggleBtn" class="menu-item">
+                <img
+                  src="images/icon_mode.png"
+                  alt="Mode"
+                  class="inline-icon icon-mode"
+                />
+                Chuyển giao diện
+              </button>
+              <button id="logoutBtn" class="menu-item">
+                <img
+                  src="images/icon_logout.png"
+                  alt="Logout"
+                  class="inline-icon icon-logout"
+                />
+                Đăng Xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard-content">
+        <!-- Left Sidebar - Trash Levels -->
+        <aside class="sidebar-left">
+          <div class="trash-monitor">
+            <h3>
+              <img
+                src="images/icon_trash.png"
+                alt="Trash"
+                class="inline-icon section-icon"
+              />
+              Mức Độ Rác
+            </h3>
+
+            <div class="trash-container">
+              <div class="trash-level">
+                <div class="trash-bin" id="inorganic-fill">
+                  <img class="trash-icon" src="images/VC_0.png" alt="Vô Cơ" />
+                </div>
+                <label>Vô Cơ</label>
+              </div>
+
+              <div class="trash-level">
+                <div class="trash-bin" id="organic-fill">
+                  <img class="trash-icon" src="images/HC_0.png" alt="Hữu Cơ" />
+                </div>
+                <label>Hữu Cơ</label>
+              </div>
+
+              <div class="trash-level">
+                <div class="trash-bin full" id="recycle-fill">
+                  <img
+                    class="trash-icon"
+                    src="images/TC_100.png"
+                    alt="Tái Chế"
+                  />
+                </div>
+                <label>Tái Chế</label>
+              </div>
+
+              <div class="trash-level">
+                <div class="trash-bin full" id="other-fill">
+                  <img class="trash-icon" src="images/K_100.png" alt="Khác" />
+                </div>
+                <label>Khác</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- System Stats (now: battery capacity) -->
+          <div class="system-stats">
+            <h3>
+              <img
+                src="images/icon_pin.png"
+                alt="Pin"
+                class="inline-icon icon-pin"
+              />
+              Dung Lượng Pin
+            </h3>
+            <div class="battery-widget">
+              <div class="battery-header">
+                <span>Pin</span>
+                <strong id="batteryLevel">87%</strong>
+              </div>
+
+              <div class="battery-bar-outer" aria-hidden="true">
+                <div
+                  class="battery-bar-fill"
+                  id="batteryFill"
+                  style="width: 87%"
+                ></div>
+              </div>
+
+              <div class="battery-note">
+                Tình trạng: <span id="batteryStatusText">Ổn</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Center - Video Stream & IMU Monitor -->
+        <section class="main-content">
+          <!-- Video Stream -->
+          <div class="video-container">
+            <div class="video-header">
+              <h3>
+                <img
+                  src="images/icon_img.png"
+                  alt=""
+                  class="inline-icon icon-img"
+                />
+                Ảnh phân loại gần nhất
+              </h3>
+              <div id="cameraStatusBadge" class="camera-status">
+                <span id="cameraStatusDot" class="status-indicator"></span>
+                <span id="cameraStatusText">WAITING</span>
+              </div>
+            </div>
+            <div class="video-stream" style="position: relative">
+              <!-- Chỉ hiển thị ảnh snapshot mới nhất từ Flask/OpenCV; không dùng video stream -->
+              <img
+                id="snapshotView"
+                src=""
+                style="
+                  width: 100%;
+                  height: 100%;
+                  object-fit: contain;
+                  display: none;
+                "
+              />
+
+              <div
+                id="snapshotMeta"
+                style="
+                  position: absolute;
+                  left: 12px;
+                  bottom: 12px;
+                  padding: 6px 10px;
+                  border-radius: 10px;
+                  background: rgba(0, 0, 0, 0.55);
+                  color: white;
+                  font-size: 13px;
+                  display: none;
+                "
+              ></div>
+
+              <!-- Hiển thị khi chưa có ảnh hoặc mất kết nối tới Flask camera server -->
+              <div id="streamPlaceholder" class="video-placeholder">
+                <img
+                  id="placeholderIcon"
+                  src="images/icon_imgerr.png"
+                  alt="No Image"
+                  class="placeholder-icon"
+                />
+                <p>Chờ hệ thống phát hiện rác...</p>
+              </div>
+              <img
+                id="snapshotBadgeIcon"
+                src="images/icon_img.png"
+                alt="Image Icon"
+                class="snapshot-badge"
+                style="display: none"
+              />
+            </div>
+
+            <div class="snapshot-actions">
+              <button
+                id="saveSnapshotBtn"
+                class="action-btn save-btn green-gradient"
+                type="button"
+              >
+                💾 Lưu ảnh
+              </button>
+              <button
+                id="autoSaveToggleBtn"
+                class="action-btn toggle-btn green-gradient"
+                type="button"
+              >
+                Tự động lưu: Bật
+              </button>
+              <button
+                id="chooseSaveFolderBtn"
+                class="action-btn folder-btn green-gradient"
+                type="button"
+              >
+                📁 Chọn thư mục lưu
+              </button>
+            </div>
+            <div id="saveFolderLabel" class="snapshot-folder-label">
+              Chưa chọn thư mục lưu. Mặc định dùng Download.
+            </div>
+          </div>
+
+          <!-- IMU Monitor removed -->
+
+        </section>
+
+        <!-- Right Sidebar (manual controls removed) -->
+        <aside class="sidebar-right">
+          <!-- Vehicle Status Panel (same-level as command-log) -->
+          <div class="vehicle-panel" id="vehiclePanel">
+            <h3>
+              <img
+                src="images/icon_login.png"
+                alt="Xe"
+                class="inline-icon section-icon"
+              />
+              Trạng Thái Xe
+              <span id="vehicleProgressText" style="float:right; font-size: 13px; color: var(--text-secondary); text-transform: none; letter-spacing: normal; margin-top: 4px;"></span>
+            </h3>
+            <div class="vehicle-states">
+              <div class="vehicle-state waiting active" id="stateWaiting">
+                Chờ
+              </div>
+              <div class="vehicle-state moving" id="stateMoving">Di chuyển</div>
+              <div class="vehicle-state arrived" id="stateArrived">Đã đến</div>
+              <div class="vehicle-state returned" id="stateReturned">Đã về</div>
+            </div>
+            <!-- Bản đồ nằm trong panel trạng thái -->
+            <div id="mapContainer" style="margin-top: 10px">
+              <canvas
+                id="mapCanvas"
+                width="360"
+                height="160"
+                style="
+                  width: 100%;
+                  height: auto;
+                  border-radius: 8px;
+                  border: 1px solid rgba(255, 255, 255, 0.06);
+                  background: var(--bg-tertiary);
+                "
+              ></canvas>
+            </div>
+          </div>
+          <!-- Command Log -->
+          <div class="command-log">
+            <h3>
+              <img
+                src="images/icon_log.png"
+                alt="Nhật ký"
+                class="inline-icon icon-log"
+              />
+              Nhật Ký Hoạt Động
+              <span class="log-controls">
+                <button
+                  id="zoomOutLogBtn"
+                  class="small-btn green-gradient"
+                  title="Thu nhỏ chữ"
+                >
+                  A-
+                </button>
+                <button
+                  id="zoomInLogBtn"
+                  class="small-btn green-gradient"
+                  title="Phóng to chữ"
+                >
+                  A+
+                </button>
+              </span>
+            </h3>
+            <div class="log-content" id="commandLog">
+              <p class="log-entry">[Chờ lệnh...]</p>
+            </div>
+            <button id="clearLogBtn" class="clear-btn green-gradient">
+              Xóa Nhật Ký
+            </button>
+          </div>
+        </aside>
+      </main>
+
+      <!-- Footer -->
+      <footer class="dashboard-footer">
+        <div class="footer-info">
+          <span>🕐 Thời Gian: <span id="currentTime">00:00:00</span></span>
+          <span
+            >📡 Kết Nối:
+            <span id="connectionStatus" class="connection-good">Tốt</span></span
+          >
+          <span>🔗 Ping: <span id="pingValue">--ms</span></span>
+        </div>
+        <div class="footer-credits">
+          <p>© 2026 HỆ THỐNG XE TỰ HÀNH TÍCH HỢP PHÂN LOẠI RÁC - DATN</p>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Single bundled JS -->
+    <script src="main.js"></script>
+  </body>
+</html>
