@@ -7,9 +7,13 @@
 #include "servo_control.h"
 #include "sensor_handler.h"
 #include "uart_handler.h"
+#include "led_control.h"
 
 static const char *TAG = "3AE_MAIN";
 QueueHandle_t xCmdQueue; 
+
+// Biến tĩnh toàn cục lưu trữ trạng thái thùng đầy qua các vòng lặp quét siêu âm
+static bool g_bin_full = false;
 
 void sorting_task(void *pvParameters) {
     char cmd;
@@ -22,6 +26,7 @@ void sorting_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(2000)); 
 
     while (1) {
+        led_control_update(g_bin_full, battery_is_low());
         int ir_val = gpio_get_level(IR_SENSOR_GPIO);
 
         if (ir_val == 0 && !object_present) {
@@ -37,7 +42,7 @@ void sorting_task(void *pvParameters) {
             }
         }
 
-        if (object_present && xQueueReceive(xCmdQueue, &cmd, pdMS_TO_TICKS(10))) {
+        if (object_present && xQueueReceive(xCmdQueue, &cmd, pdMS_TO_TICKS(10000))) {
             if (cmd >= '1' && cmd <= '4') {
                 buzzer_beep();
                 vTaskDelay(pdMS_TO_TICKS(100)); // Khoảng nghỉ ngắn giữa 2 tiếng bíp
@@ -70,10 +75,12 @@ void sorting_task(void *pvParameters) {
                 
                 // Kiểm tra nếu khoảng cách đo được nhỏ hơn ngưỡng thì báo thùng đầy
                 if (dist > 0.0f && dist < DIST_THRESHOLD_FULL) {
-                    bin_full = 1; 
+                    bin_full = 1;
+                    g_bin_full = true; // Khóa cờ
+                } else {
+                    g_bin_full = false; // Nhả cờ
                 }
 
-                // buzzer_beep();
 
                 if (bin_full == 1){
                     buzzer_long_beep();
@@ -120,6 +127,7 @@ void app_main(void) {
     uart_init_handler(); 
     sensor_init();
     ESP_ERROR_CHECK(battery_adc_init());
+    led_control_init();
     
     xCmdQueue = xQueueCreate(10, sizeof(char));
 

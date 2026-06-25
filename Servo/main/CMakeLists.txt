@@ -5,12 +5,13 @@ idf_component_register(
         "src/servo_control.c" 
         "src/sensor_handler.c" 
         "src/uart_handler.c"
+        "src/led_control.c"
     INCLUDE_DIRS 
         "include" 
         "."
     REQUIRES 
         esp_driver_ledc
-        esp_driver_gpio      # THAY CHO "driver" ĐỂ CHẮC CHẮN NHẬN driver/gpio.h
+        esp_driver_gpio      
         esp_driver_mcpwm      # Cho Servo
         esp_driver_uart       # Cho UART
         esp_timer             # Cho Siêu âm

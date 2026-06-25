@@ -50,8 +50,8 @@
 
 
 // LED Trạng thái 
-// #define LED_READY_GPIO     2  // LED Xanh lá: Hệ thống sẵn sàng
-// #define LED_BUSY_GPIO      3  // LED Vàng/Xanh dương: Đang xử lý/Quay Servo
-// #define LED_ERROR_GPIO     9  // LED Đỏ: Thùng đầy hoặc lỗi kết nối Pi 4
+#define LED_GREEN_GPIO     35  // LED Xanh lá: Hoạt động bình thường
+#define LED_YELLOW_GPIO    36  // LED Vàng: Pin yếu (< 30%)
+#define LED_RED_GPIO       37  // LED Đỏ: Thùng rác đầy
 
 #endif
