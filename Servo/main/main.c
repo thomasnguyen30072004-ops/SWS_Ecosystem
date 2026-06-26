@@ -34,7 +34,8 @@ void sorting_task(void *pvParameters) {
             if (gpio_get_level(IR_SENSOR_GPIO) == 0) {
                 buzzer_beep();
                 
-                //Thêm fflush để Pi 4 nhận được lệnh bật Cam ngay lập tức
+                // xQueueReset(xCmdQueue);
+                
                 printf("CMD_START_CAM\n"); 
                 fflush(stdout); 
                 
@@ -42,7 +43,7 @@ void sorting_task(void *pvParameters) {
             }
         }
 
-        if (object_present && xQueueReceive(xCmdQueue, &cmd, pdMS_TO_TICKS(10000))) {
+        if (object_present && xQueueReceive(xCmdQueue, &cmd, pdMS_TO_TICKS(15000))) {
             if (cmd >= '1' && cmd <= '4') {
                 buzzer_beep();
                 vTaskDelay(pdMS_TO_TICKS(100)); // Khoảng nghỉ ngắn giữa 2 tiếng bíp
@@ -67,14 +68,17 @@ void sorting_task(void *pvParameters) {
 
                 // --- QUAY TILT VỀ 90 ĐỂ ĐO MỨC RÁC ---
                 servo_write_angle(SERVO_TILT, 92); 
-                vTaskDelay(pdMS_TO_TICKS(1500)); // Đứng yên 1.5s cho khay hết rung và đo siêu âm
+                vTaskDelay(pdMS_TO_TICKS(2000)); // Đứng yên 2s cho khay hết rung và đo siêu âm
 
                 // Đo khoảng cách thực tế
                 int bin_full = 0;
                 float dist = sensor_get_dist(ECHO_BIN1); 
+
+                printf("[SIEU_AM_LOG] CMD:%c | DIST_RAW: %.2f cm\n", cmd, dist);
+                fflush(stdout);
                 
                 // Kiểm tra nếu khoảng cách đo được nhỏ hơn ngưỡng thì báo thùng đầy
-                if (dist > 0.0f && dist < DIST_THRESHOLD_FULL) {
+                if (dist > 3.5f && dist < DIST_THRESHOLD_FULL) {
                     bin_full = 1;
                     g_bin_full = true; // Khóa cờ
                 } else {
