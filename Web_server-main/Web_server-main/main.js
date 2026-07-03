@@ -4,8 +4,8 @@
 
 // -------- config.js --------
 const CONFIG = {
-  API_BASE_URL: "http://192.168.1.26:8085",
-  WS_URL: "ws://192.168.1.26:8080",
+  API_BASE_URL: "http://raspitd.local:8085",
+  WS_URL: "ws://raspitd.local:8080",
   DEMO_MODE: false,
   CHART_UPDATE_INTERVAL: 1000,
   TRASH_CHECK_INTERVAL: 2000,
@@ -2172,7 +2172,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 // ------------------- WebSocket Integration -------------------
-const WS_URL = "ws://<PI_IP>:8080"; // TODO: replace with Pi IP
+const WS_URL = "ws://<raspitd.local>:8080"; // TODO: replace with Pi IP
 let ws = new WebSocket(WS_URL);
 
 ws.addEventListener("open", () => {

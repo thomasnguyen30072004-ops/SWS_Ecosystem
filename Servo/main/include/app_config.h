@@ -21,7 +21,7 @@
 // #define ECHO_BIN2          11 // Ngoài
 
 /* --- Ngưỡng khoảng cách (cm) --- */
-#define DIST_THRESHOLD_FULL    15.0  // Bé hơn 15cm là báo đầy
+#define DIST_THRESHOLD_FULL    10.0  // Bé hơn 10cm là báo đầy
 #define DIST_MAX_RANGE         400.0 // Giới hạn tối đa của cảm biến
 // #define ECHO_BIN3          6 // Thùng Tái chế
 // #define ECHO_BIN4          7 // Thùng Khác 
