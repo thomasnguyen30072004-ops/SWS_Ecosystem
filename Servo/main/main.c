@@ -130,7 +130,7 @@ void app_main(void) {
     servo_init_hardware(); 
     uart_init_handler(); 
     sensor_init();
-    ESP_ERROR_CHECK(battery_adc_init());
+    // ESP_ERROR_CHECK(battery_adc_init());
     led_control_init();
     
     xCmdQueue = xQueueCreate(10, sizeof(char));

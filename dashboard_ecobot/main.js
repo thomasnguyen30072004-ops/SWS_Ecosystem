@@ -18,6 +18,10 @@ const CONFIG = {
   DEFAULT_MODE: "manual",
 };
 
+const ROBOT_API_URL = "http://raspitd.local:8088/api/robot/status";
+const ROBOT_STATUS_POLL_INTERVAL_MS = 2000;
+const ROBOT_STATUS_TIMEOUT_MS = 1500;
+
 // -------- state.js --------
 let appState = {
   isAuthenticated: false,
@@ -598,8 +602,13 @@ function updateWebSnapshot() {
     })
     .catch((err) => {
       // Trường hợp mất kết nối hoặc Flask camera server chưa chạy
-      if (statusText) statusText.innerText = "OFFLINE";
-      if (statusDot) statusDot.style.backgroundColor = "#e74c3c";
+      if (lastRobotConnectionOk) {
+        if (statusText) statusText.innerText = "WAITING";
+        if (statusDot) statusDot.style.backgroundColor = "#f1c40f";
+      } else {
+        if (statusText) statusText.innerText = "OFFLINE";
+        if (statusDot) statusDot.style.backgroundColor = "#e74c3c";
+      }
       if (snapshotImg) {
         snapshotImg.style.display = "none";
         try {
@@ -978,8 +987,9 @@ function connectToBackend() {
   }
 }
 
-function setConnectionStatus(connected) {
-  appState.wsConnected = Boolean(connected);
+let robotApiControlsHeaderStatus = false;
+
+function setHeaderConnectionStatus(connected) {
   const el = document.getElementById("firebaseStatus");
   if (!el) return;
   el.classList.remove("connected", "disconnected");
@@ -991,6 +1001,20 @@ function setConnectionStatus(connected) {
     el.textContent = "Disconnected";
   }
 }
+
+function setConnectionStatus(connected) {
+  appState.wsConnected = Boolean(connected);
+  if (robotApiControlsHeaderStatus) return;
+  setHeaderConnectionStatus(connected);
+}
+
+function setCameraStatus(status, color) {
+  const statusText = document.getElementById("cameraStatusText");
+  const statusDot = document.getElementById("cameraStatusDot");
+  if (statusText) statusText.innerText = status;
+  if (statusDot) statusDot.style.backgroundColor = color;
+}
+
 function showNotification(message, type = "info") {
   const notification = document.createElement("div");
   notification.className = `notification notification-${type}`;
@@ -1913,6 +1937,7 @@ window.addEventListener("beforeunload", () => {
       typeof window.__piBinsPolling.stop === "function"
     )
       window.__piBinsPolling.stop();
+    if (window.__robotStatusPolling) clearInterval(window.__robotStatusPolling);
   } catch (e) {
     /* ignore */
   }
@@ -2070,6 +2095,149 @@ class RobotVehicleMap {
 
 // Global variable for map instance
 let globalRobotMap = null;
+let lastRobotConnectionOk = null;
+
+function mapSystemStateToVehicleState(systemState) {
+  const state = String(systemState || "UNKNOWN").toUpperCase();
+  if (state === "NAVIGATING") return "moving";
+  if (state === "ARRIVED") return "arrived";
+  return "waiting";
+}
+
+function getRobotStatusClass(systemState, isConnected = true) {
+  if (!isConnected) return "robot-state-error";
+  const state = String(systemState || "UNKNOWN").toUpperCase();
+  if (state === "NAVIGATING") return "robot-state-active";
+  if (state === "ARRIVED") return "robot-state-success";
+  if (["NAV_FAILED", "ERROR", "TIMEOUT", "CANCELED"].includes(state)) {
+    return "robot-state-warning";
+  }
+  if (state === "IDLE") return "robot-state-idle";
+  return "robot-state-neutral";
+}
+
+function setTextContentById(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function formatOptionalValue(value, suffix = "") {
+  if (value === null || value === undefined || value === "") return "--";
+  return `${value}${suffix}`;
+}
+
+function formatRobotDistance(data) {
+  const rawDistance = data?.navigation?.distance_remaining;
+
+  if (data?.system_state === "ARRIVED" || data?.nav_status === "SUCCEEDED") {
+    return "0.00 m";
+  }
+
+  if (typeof rawDistance === "number") {
+    return `${rawDistance.toFixed(2)} m`;
+  }
+
+  return "--";
+}
+
+function updateRobotConnectionStatus(isConnected) {
+  robotApiControlsHeaderStatus = true;
+  appState.wsConnected = Boolean(isConnected);
+  setHeaderConnectionStatus(isConnected);
+
+  const connectionStatus = document.getElementById("connectionStatus");
+  if (!connectionStatus) return;
+  connectionStatus.textContent = isConnected ? "Tốt" : "Mất kết nối robot";
+  connectionStatus.classList.toggle("connection-good", isConnected);
+  connectionStatus.classList.toggle("connection-bad", !isConnected);
+}
+
+function updateCameraStatusFromRobot(data, isConnected) {
+  if (!isConnected) {
+    setCameraStatus("OFFLINE", "#e74c3c");
+    return;
+  }
+
+  if (data?.ai_result?.available === true) {
+    setCameraStatus("DONE", "#2ecc71");
+  } else {
+    setCameraStatus("WAITING", "#f1c40f");
+  }
+}
+
+function updateRobotStatusUI(data, isConnected = true) {
+  const panel = document.getElementById("vehiclePanel");
+  const statusText = isConnected
+    ? data?.status_text || "Không xác định"
+    : "Mất kết nối robot";
+  const systemState = isConnected ? data?.system_state || "UNKNOWN" : "ERROR";
+  const statusClass = getRobotStatusClass(systemState, isConnected);
+
+  setTextContentById("robotStatusText", statusText);
+  updateRobotConnectionStatus(isConnected);
+  updateCameraStatusFromRobot(data, isConnected);
+
+  if (panel) {
+    panel.classList.remove(
+      "robot-state-idle",
+      "robot-state-active",
+      "robot-state-success",
+      "robot-state-warning",
+      "robot-state-error",
+      "robot-state-neutral",
+    );
+    panel.classList.add(statusClass);
+  }
+
+  if (isConnected) {
+    window.updateVehicleStateFromPi(mapSystemStateToVehicleState(systemState));
+
+    updateBatteryFromStatusPayload(data);
+
+    setTextContentById("robotLidarText", formatOptionalValue(data?.hardware?.lidar));
+    setTextContentById("robotOdomText", formatOptionalValue(data?.hardware?.odom));
+    setTextContentById("robotDistanceText", formatRobotDistance(data));
+  } else {
+    window.updateVehicleStateFromPi("waiting");
+    setTextContentById("robotLidarText", "--");
+    setTextContentById("robotOdomText", "--");
+    setTextContentById("robotDistanceText", "--");
+  }
+}
+
+async function fetchRobotStatus() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ROBOT_STATUS_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(ROBOT_API_URL, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Robot API HTTP ${response.status}`);
+
+    const data = await response.json();
+    updateRobotStatusUI(data, true);
+    lastRobotConnectionOk = true;
+  } catch (error) {
+    updateRobotStatusUI(null, false);
+    if (lastRobotConnectionOk !== false) {
+      console.warn("Robot status API unavailable:", error);
+      if (typeof addCommandLog === "function") {
+        addCommandLog("Mất kết nối robot", "warning");
+      }
+    }
+    lastRobotConnectionOk = false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function startRobotStatusPolling() {
+  fetchRobotStatus();
+  return setInterval(fetchRobotStatus, ROBOT_STATUS_POLL_INTERVAL_MS);
+}
 
 // Global Function to update Vehicle State from Raspberry Pi
 window.updateVehicleStateFromPi = function (stateValue, progress = null) {
@@ -2144,6 +2312,8 @@ window.updateVehicleStateFromPi = function (stateValue, progress = null) {
   } catch (e) {}
 
   // 4. Log Activity
+  if (window.__lastVehicleStateKey === stateKey) return;
+  window.__lastVehicleStateKey = stateKey;
   try {
     const textMap = {
       waiting: "Chờ",
@@ -2170,10 +2340,15 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch (err) {
     console.warn("RobotVehicleMap init failed", err);
   }
+  window.__robotStatusPolling = startRobotStatusPolling();
 });
 // ------------------- WebSocket Integration -------------------
-const WS_URL = "ws://<raspitd.local>:8080"; // TODO: replace with Pi IP
-let ws = new WebSocket(WS_URL);
+const WS_URL = "ws://<PI_IP>:8080"; // TODO: replace with Pi IP
+let ws = null;
+
+/*
+if (false) {
+ws = new WebSocket(WS_URL);
 
 ws.addEventListener("open", () => {
   console.log("✅ WebSocket connected to Pi");
@@ -2233,14 +2408,76 @@ ws.addEventListener("close", (e) => {
   }, 3000);
 });
 
+}
+
+*/
+
 // ------------------- Helper Functions -------------------
+function getLatestBatteryPercent() {
+  const candidates = [
+    typeof localStorage !== "undefined" ? localStorage.getItem("latestBattery") : null,
+    appState?.statistics?.battery,
+  ];
+
+  for (const value of candidates) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return Math.max(0, Math.min(100, numeric));
+    }
+  }
+
+  return null;
+}
+
+function updateBatteryFromStatusPayload(data) {
+  if (typeof data?.battery === "number" && Number.isFinite(data.battery)) {
+    updateBatteryStatus(data.battery);
+    return;
+  }
+
+  const latestBattery = getLatestBatteryPercent();
+  if (latestBattery !== null) {
+    updateBatteryStatus(latestBattery);
+  }
+}
+
 function updateBatteryStatus(percent) {
+  const numeric = Number(percent);
+  if (!Number.isFinite(numeric)) return;
+
   const el = document.getElementById("batteryLevel");
-  if (!el) return;
-  const clamped = Math.max(0, Math.min(100, percent));
-  el.textContent = `${clamped}%`;
-  el.style.color =
-    clamped > 60 ? "#2ecc71" : clamped > 30 ? "#f1c40f" : "#e74c3c";
+  const clamped = Math.max(0, Math.min(100, numeric));
+  const rounded = Math.round(clamped);
+
+  appState.statistics.battery = rounded;
+
+  if (el) {
+    el.textContent = `${rounded}%`;
+    el.style.color =
+      rounded > 60 ? "#2ecc71" : rounded > 30 ? "#f1c40f" : "#e74c3c";
+  }
+
+  const batteryFill = document.getElementById("batteryFill");
+  if (batteryFill) {
+    batteryFill.style.width = `${rounded}%`;
+    batteryFill.classList.remove("low", "medium", "high");
+    if (rounded < 20) batteryFill.classList.add("low");
+    else if (rounded < 40) batteryFill.classList.add("medium");
+    else batteryFill.classList.add("high");
+  }
+
+  const statusText = document.getElementById("batteryStatusText");
+  if (statusText) {
+    statusText.textContent = rounded < 40 ? "Pin yếu" : "Ổn";
+  }
+
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("latestBattery", String(rounded));
+    }
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 function addSnapshotToGallery(url) {

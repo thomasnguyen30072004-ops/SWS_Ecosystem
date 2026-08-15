@@ -337,6 +337,16 @@
               <div class="vehicle-state arrived" id="stateArrived">Đã đến</div>
               <div class="vehicle-state returned" id="stateReturned">Đã về</div>
             </div>
+            <div class="robot-status-summary" aria-live="polite">
+              <div id="robotStatusText" class="robot-status-main">
+                Đang chờ dữ liệu robot
+              </div>
+              <div class="robot-status-meta">
+                <span>Lidar: <strong id="robotLidarText">--</strong></span>
+                <span>Odom: <strong id="robotOdomText">--</strong></span>
+                <span>Quãng đường: <strong id="robotDistanceText">--</strong></span>
+              </div>
+            </div>
             <!-- Bản đồ nằm trong panel trạng thái -->
             <div id="mapContainer" style="margin-top: 10px">
               <canvas
@@ -400,8 +410,9 @@
           <span>🔗 Ping: <span id="pingValue">--ms</span></span>
         </div>
         <div class="footer-credits">
-          <p>© 2026 HỆ THỐNG XE TỰ HÀNH TÍCH HỢP PHÂN LOẠI RÁC - DATN</p>
-        </div>
+          <p>© 2026 HỆ THỐNG XE TỰ HÀNH TÍCH HỢP PHÂN LOẠI RÁC</p>          <p class="footer-team">
+          Tuấn Tú - 0852041609 - pntuantu04@gmail.com | Phúc Duy - 0328313042 - dophucduy3@gmail.com
+          </p>        </div>
       </footer>
     </div>
 
